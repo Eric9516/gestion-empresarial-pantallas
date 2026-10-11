@@ -1,0 +1,56 @@
+{
+  "modulos": [
+    {
+      "id": "proveedores",
+      "nombre": "Proveedores",
+      "componente": "abastecimiento",
+      "descripcion": "Directorio de proveedores, con sus contactos y rubros.",
+      "requiere": [],
+      "bloquea": "los datos de proveedores y sus contactos (y con eso, Envíos, Reparaciones y proveedores por repuesto)"
+    },
+    {
+      "id": "comisionistas",
+      "nombre": "Comisionistas",
+      "componente": "abastecimiento",
+      "descripcion": "Directorio de comisionistas, con campos personalizables.",
+      "requiere": [],
+      "bloquea": "los datos de comisionistas"
+    },
+    {
+      "id": "envios",
+      "nombre": "Envíos con rótulos",
+      "componente": "abastecimiento",
+      "descripcion": "Rótulos de envío en PDF, con el diseño de la empresa. Cada envío es de un proveedor.",
+      "requiere": [
+        "proveedores"
+      ],
+      "bloquea": "los envíos, sus bultos y fotos, los diseños de rótulo y la carpeta de archivos de envíos"
+    },
+    {
+      "id": "deposito",
+      "nombre": "Depósito",
+      "componente": "abastecimiento",
+      "descripcion": "Repuestos, stock, retiros, ajustes de inventario e informe de reposición. Los proveedores por repuesto necesitan además el módulo de proveedores.",
+      "requiere": [],
+      "bloquea": "repuestos, familias, stock, retiros, ajustes, sectores, planilla de familias y la carpeta de fotos de repuestos"
+    },
+    {
+      "id": "mantenimiento",
+      "nombre": "Mantenimiento",
+      "componente": "mantenimiento",
+      "descripcion": "Equipos y reparaciones (después, manuales y despiece). Necesita el depósito para los repuestos; las reparaciones necesitan además proveedores.",
+      "requiere": [
+        "deposito"
+      ],
+      "bloquea": "equipos, repuestos por equipo, reparaciones y la carpeta de documentos"
+    },
+    {
+      "id": "tareas",
+      "nombre": "Tareas",
+      "componente": "base",
+      "descripcion": "Tareas con semáforo para cada persona.",
+      "requiere": [],
+      "bloquea": "las tareas y su historial"
+    }
+  ]
+}

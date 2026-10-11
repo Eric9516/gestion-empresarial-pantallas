@@ -1,0 +1,16 @@
+/* El CSS viejo va en una capa de menor prioridad que las utilidades de Tailwind:
+   así los componentes nuevos pueden pisarlo, y lo viejo se ve igual que antes. */
+@layer legacy, theme, base, components, utilities;
+
+@import "./base.css" layer(legacy);
+@import "./layout.css" layer(legacy);
+@import "./components.css" layer(legacy);
+@import "./admin.css" layer(legacy);
+@import "./mobile.css" layer(legacy);
+@import "./tareas.css" layer(legacy);
+@import "./tailwind.css";
+/* Sin capa a propósito: gana sobre las variables de Tailwind (ver variables.css). */
+@import "./variables.css";
+@import "./contexto-botones.css";
+@import "./contexto-campos.css";
+@import "./foco-teclado.css";

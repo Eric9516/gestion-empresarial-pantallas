@@ -1,0 +1,316 @@
+/* Auth, cabecera, navegación, estructura principal y estadísticas
+   Mobile-first: las reglas sin @media son la base para pantallas chicas;
+   @media (min-width: ...) agrega/ajusta para pantallas más anchas. */
+
+/* ===== AUTH ===== */
+/* En la app vieja esto era un id (#authScreen) porque había un solo div fijo en
+   el HTML. Acá es un componente de React que se monta/desmonta, así que pasa a
+   ser una clase — mismos estilos, sin cambiar nada visualmente. */
+.auth-screen,
+#authScreen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-mid) 50%, var(--blue-light) 100%);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+#authScreen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 20% 50%, rgba(200,34,42,0.15) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(255,255,255,0.05) 0%, transparent 40%);
+}
+
+.auth-decorations { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+.icon-float {
+  position: absolute;
+  font-size: 40px;
+  opacity: 0.07;
+  animation: floatIcon linear infinite;
+}
+
+@keyframes floatIcon {
+  0% { transform: translateY(110vh) rotate(0deg); }
+  100% { transform: translateY(-10vh) rotate(360deg); }
+}
+
+.auth-card {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  position: relative;
+  z-index: 1;
+  animation: slideUp 0.4s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.auth-logo { text-align: center; margin-bottom: 28px; }
+.auth-logo img { height: 70px; object-fit: contain; }
+.auth-logo-fallback {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--blue); color: white; font-family: var(--font-display);
+  font-size: 28px; width: 80px; height: 80px; border-radius: 50%;
+}
+.auth-title { text-align: center; font-size: 22px; font-weight: 800; color: var(--blue); margin-bottom: 4px; }
+.auth-subtitle { text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 28px; font-weight: 500; }
+.auth-error { background: var(--danger-bg); color: var(--danger); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; font-weight: 600; margin-bottom: 16px; text-align: center; }
+
+/* ===== APP SHELL =====
+   En la app vieja cada pantalla era un div fijo escondido con display:none hasta
+   que se le agregaba .visible a mano. Acá cada pantalla es una ruta/componente de
+   React que solo existe montada cuando corresponde, así que no hace falta la
+   lógica de mostrar/ocultar — dejamos solo el layout (flex en columna). */
+.app-screen, .mantenimiento-screen, .admin-screen { display: flex; min-height: 100vh; flex-direction: column; }
+
+.mantenimiento-screen .app-header { background: linear-gradient(90deg, var(--mant) 0%, var(--mant-mid) 100%); box-shadow: 0 2px 12px rgba(154,91,18,0.25); }
+.mantenimiento-screen .nav-tab.active { color: var(--mant-mid); border-bottom-color: var(--mant); }
+.mantenimiento-screen .nav-tab:hover { color: var(--mant-mid); }
+
+.admin-screen .app-header { background: linear-gradient(90deg, #374151 0%, #4b5563 100%); box-shadow: 0 2px 12px rgba(30,35,45,0.25); }
+
+.loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-weight: 600; }
+
+.btn-mantenimiento {
+  display: none; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.14);
+  color: white; font-size: 13px; font-weight: 700;
+  padding: 7px 14px; border-radius: 30px;
+  cursor: pointer; border: none; transition: background 0.2s;
+  text-decoration: none;
+}
+.btn-mantenimiento:hover { background: rgba(255,255,255,0.26); }
+
+.btn-volver-directorio {
+  display: none; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.14);
+  color: white; font-size: 13px; font-weight: 700;
+  padding: 7px 14px; border-radius: 30px;
+  cursor: pointer; border: none; transition: background 0.2s;
+  text-decoration: none;
+}
+.btn-volver-directorio:hover { background: rgba(255,255,255,0.26); }
+
+/* Botón flotante de escaneo — mobile-first: visible por defecto dentro de la
+   pestaña "Buscar" de Mantenimiento, se apaga en pantallas grandes donde el
+   escáner no hace falta (mismo patrón que .fab-new-task de Tareas). */
+.fab-scan {
+  display: none;
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  right: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--mant);
+  color: white;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--mant) 40%, transparent);
+  z-index: 140;
+  transition: all 0.2s;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.fab-scan:hover { transform: scale(1.08); }
+.fab-scan:active { transform: scale(0.95); }
+#paneMantBuscar .fab-scan { display: flex; }
+#paneMantBuscar { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+
+/* ===== HEADER ===== */
+.app-header {
+  background: linear-gradient(90deg, var(--blue) 0%, var(--blue-mid) 100%);
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--blue) 25%, transparent);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-logo { display: flex; align-items: center; gap: 12px; }
+/* Bug preexistente de la app vieja: forzaba CUALQUIER logo a blanco sólido
+   (brightness(0) invert(1)) — con un logo de un solo color plano quedaba
+   como un ícono blanco prolijo, pero con un logo real (varios tonos, fondo
+   no transparente) lo aplastaba a un rectángulo blanco irreconocible. Se
+   saca el filtro para que se vea igual que en el login y en la vista previa
+   de Admin, que nunca tuvieron este filtro. */
+.header-logo img { height: 34px; object-fit: contain; }
+.header-logo-fallback { color: white; font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+.header-title { display: none; color: rgba(255,255,255,0.75); font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.hide-mobile { display: none; }
+
+.user-badge {
+  display: none; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.12);
+  padding: 5px 12px 5px 6px;
+  border-radius: 30px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.user-badge:hover { background: rgba(255,255,255,0.2); }
+
+.user-avatar {
+  width: 28px; height: 28px;
+  background: var(--red);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 12px; font-weight: 800;
+  flex-shrink: 0;
+}
+.user-name { color: white; font-size: 13px; font-weight: 600; }
+
+/* ===== NAV TABS =====
+   En mobile la navegación vive en el menú hamburguesa (mobile.css); .app-nav
+   solo aparece a partir del breakpoint de escritorio. */
+.app-nav {
+  display: none;
+  background: var(--white);
+  border-bottom: 2px solid var(--border);
+  padding: 0 16px;
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.app-nav::-webkit-scrollbar { display: none; }
+
+.nav-tab {
+  padding: 13px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: var(--font);
+  flex-shrink: 0;
+}
+.nav-tab:hover { color: var(--blue); }
+.nav-tab.active { color: var(--blue); border-bottom-color: var(--red); }
+
+/* ===== MAIN ===== */
+.app-main {
+  flex: 1;
+  padding: 14px;
+  max-width: 1300px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ===== ENCABEZADO DE SECCIÓN ===== */
+.section-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.section-title { font-size: 17px; font-weight: 800; color: var(--blue); display: flex; align-items: center; gap: 10px; }
+.section-actions { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
+
+/* ===== TOOLBAR ===== */
+.toolbar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+.search-wrap { flex: 1; min-width: unset; position: relative; }
+.search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+/* La regla base "select{width:100%}" (pensada para selects sueltos en un
+   .form-group) le ganaba a esta clase cuando no tenía al lado un .search-wrap
+   con flex:1 que absorbiera el espacio — pasaba en el filtro de usuario del
+   historial de retiros, que no tiene buscador. width:100% en mobile y auto en
+   escritorio restablece el tamaño natural dentro del toolbar en cualquier
+   combinación. */
+
+/* Mismo criterio que .filter-select: ancho completo en mobile (fácil de
+   tocar), acotado recién en escritorio. Las dos fechas van agrupadas en una
+   sola "píldora" (desde–hasta) en vez de dos campos sueltos con etiqueta. */
+.filter-date-range { width: 100%; }
+
+/* ===== ESTADÍSTICAS =====
+   Debajo de 480px las tarjetas se apilan en columna y se achican; desde 481px
+   ya usan el layout "de escritorio" en fila (esto vale también en tablets). */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 24px; }
+
+.stat-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  padding: 12px 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.stat-icon.blue { background: color-mix(in srgb, var(--blue) 10%, transparent); }
+.stat-icon.red { background: rgba(200,34,42,0.1); }
+.stat-icon.green { background: var(--success-bg); }
+.stat-number { font-size: 20px; font-weight: 800; color: var(--blue); line-height: 1; }
+.stat-label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+.meta-info { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+/* ===== DIVISOR ===== */
+.divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+/* ===== DESDE 481px: layout de estadísticas "de escritorio" ===== */
+@media (min-width: 481px) {
+  .stats-row { gap: 14px; }
+  .stat-card { padding: 16px; flex-direction: row; text-align: left; gap: 12px; }
+  .stat-icon { width: 42px; height: 42px; font-size: 20px; }
+  .stat-number { font-size: 24px; }
+  .stat-label { font-size: 12px; }
+}
+
+/* ===== DESDE 769px: layout de escritorio ===== */
+@media (min-width: 769px) {
+  .app-header { padding: 0 24px; }
+  .header-title { display: block; }
+  .hide-mobile { display: inline; }
+  .user-badge { display: flex; }
+  .app-nav { display: flex; }
+  #paneMantBuscar .fab-scan { display: none; }
+  #paneMantBuscar { padding-bottom: 0; }
+
+  .app-main { padding: 24px 20px; }
+
+  .section-header { flex-direction: row; align-items: center; }
+  .section-title { font-size: 20px; }
+  .section-actions { width: auto; }
+
+  .toolbar { flex-direction: row; }
+  .search-wrap { min-width: 180px; }
+  .filter-date-range { width: auto; }
+}

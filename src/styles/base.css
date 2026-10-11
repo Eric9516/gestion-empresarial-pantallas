@@ -1,0 +1,80 @@
+/* Reset y formularios (las variables están en variables.css) */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== FORMULARIOS ===== */
+.form-group { margin-bottom: 16px; }
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
+/* El estilo de inputs, selects y textareas vive en components/ui (Input, Select,
+   Textarea); el de los botones, en components/ui/button. */
+input[type="file"] { display: none; }
+
+/* ===== USER DROPDOWN (desktop) ===== */
+.user-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--white);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  border: 1.5px solid var(--border);
+  min-width: 180px;
+  z-index: 200;
+  padding: 6px;
+  animation: dropdownIn 0.15s ease;
+}
+.user-dropdown.open { display: block; }
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.user-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: background 0.12s;
+  text-align: left;
+}
+.user-dropdown-item:hover { background: var(--surface2); color: var(--text); }
+.user-dropdown-item.user-dropdown-danger { color: var(--danger); }
+.user-dropdown-item.user-dropdown-danger:hover { background: var(--danger-bg); }
+
+/* ===== PROFILE AVATAR ===== */
+
+/* ===== HEADER RIGHT relative for dropdown ===== */
+.header-right { position: relative; }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #b0bec5; }

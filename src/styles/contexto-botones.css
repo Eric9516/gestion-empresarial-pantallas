@@ -1,0 +1,10 @@
+/* Tamaño de los botones según dónde estén (pie de ventanas, tarjetas, encabezados
+   de sección). Sin capa a propósito: así ganan sobre las clases del componente Button. */
+.prov-card-actions [data-slot="button"] { flex: 1 1 auto; min-width: 40%; justify-content: center; font-size: 12px; padding: 8px 4px; }
+.modal-footer [data-slot="button"] { flex: 1; justify-content: center; font-size: 12px; padding: 10px 8px; }
+.section-actions [data-slot="button"] { flex: 1; justify-content: center; }
+
+@media (min-width: 769px) {
+  .modal-footer [data-slot="button"] { flex: initial; justify-content: normal; font-size: 14px; padding: 10px 20px; }
+  .section-actions [data-slot="button"] { flex: initial; justify-content: normal; }
+}

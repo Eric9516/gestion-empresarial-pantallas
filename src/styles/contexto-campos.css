@@ -1,0 +1,11 @@
+/* Reglas de campos que dependen de dónde están. Sin capa a propósito: así ganan sobre
+   las clases de los componentes Input/Select/Textarea. Solo están las que tenían
+   efecto antes de migrar (otras, como .search-wrap input, perdían contra la regla
+   global y no hacían nada). */
+.filter-select { width: 100%; min-width: 140px; }
+.campo-custom-row select { grid-column: 1; margin-bottom: 0; padding: 8px 10px; font-size: 13px; }
+
+@media (min-width: 769px) {
+  .filter-select { width: auto; }
+  .campo-custom-row select { grid-column: auto; }
+}

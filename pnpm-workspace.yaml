@@ -1,0 +1,5 @@
+allowBuilds:
+  '@sentry/cli': true
+  core-js: false
+overrides:
+  source-map-js: '>=1.2.2'

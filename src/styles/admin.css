@@ -1,0 +1,184 @@
+/* Panel admin, usuarios, campos custom, logo, toggle */
+
+/* ===== ADMIN: tabs de dos niveles ===== */
+/* Nivel 1 — grupo (Directorio / Mantenimiento / General), estilo subrayado. */
+.admin-group-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1.5px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.admin-group-tabs::-webkit-scrollbar { display: none; }
+
+.admin-group-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  margin-bottom: -1.5px;
+  white-space: nowrap;
+  background: none;
+  font-family: var(--font);
+  transition: color 0.2s;
+}
+/* El subrayado se centra bajo esta parte (la palabra sola) en vez de bajo todo
+   el botón — si se centrara contra "emoji + palabra", el peso visual del
+   emoji corre la barra hacia la izquierda de la palabra. padding/margin-bottom
+   opuestos: el span ocupa el mismo alto que el padding inferior del botón
+   (así la barra queda a ras del borde de abajo) sin sumarle altura extra. */
+.admin-group-tab-label {
+  position: relative;
+  padding-bottom: 10px;
+  margin-bottom: -10px;
+}
+.admin-group-tab-label::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--red);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform 0.2s ease;
+}
+.admin-group-tab:hover { color: var(--blue); }
+.admin-group-tab.active { color: var(--blue); }
+.admin-group-tab.active .admin-group-tab-label::after { transform: translateX(-50%) scaleX(1); }
+
+/* Nivel 2 — pestaña dentro del grupo elegido, estilo chip/píldora. */
+.admin-subnav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.admin-subnav::-webkit-scrollbar { display: none; }
+
+.admin-subtab {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mid);
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--white);
+  font-family: var(--font);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.admin-subtab:hover { border-color: var(--blue); color: var(--blue); }
+.admin-subtab.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+.admin-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.admin-card-header {
+  background: linear-gradient(90deg, var(--blue), var(--blue-mid));
+  padding: 13px 18px;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-card-body { padding: 18px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ===== RÓTULO — editor de diseño =====
+   Mobile-first: en pantallas chicas la columna de controles y la vista previa
+   se apilan; desde 769px van lado a lado y los controles quedan pegajosos
+   (max-height/overflow-y por style inline en RotuloDesignPane, acá solo se
+   anula/restaura porque el inline style es fijo en todos los anchos). */
+.admin-design-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  align-items: start;
+}
+.admin-design-grid > div:first-child { max-height: none !important; overflow-y: visible !important; padding-right: 0 !important; }
+
+/* ===== TABLA DE USUARIOS ===== */
+
+/* ===== CAMPOS CUSTOM ===== */
+.campo-custom-row {
+  display: grid;
+  grid-template-columns: 1fr 32px;
+  grid-template-rows: auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.campo-custom-row .btn-remove-contact {
+  position: static;
+  grid-row: 1;
+  grid-column: 2;
+  align-self: center;
+}
+
+/* ===== LOGO ===== */
+.logo-upload-area {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.logo-upload-area:hover { border-color: var(--blue-light); background: rgba(45,107,196,0.04); }
+.logo-upload-area img { max-height: 60px; object-fit: contain; margin-bottom: 8px; }
+.logo-upload-area p { font-size: 13px; color: var(--text-muted); }
+
+/* ===== TOGGLE ===== */
+.toggle-wrap { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+
+.toggle {
+  width: 40px; height: 22px;
+  background: var(--border);
+  border-radius: 11px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  background: white;
+  border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.toggle.on { background: var(--success); }
+.toggle.on::after { transform: translateX(18px); }
+
+/* ===== DESDE 769px: layout de escritorio ===== */
+@media (min-width: 769px) {
+  .admin-design-grid { grid-template-columns: 360px 1fr; }
+  .admin-design-grid > div:first-child { max-height: 75vh !important; overflow-y: auto !important; padding-right: 4px !important; }
+
+  .campo-custom-row {
+    grid-template-columns: 1fr 130px 32px;
+    grid-template-rows: none;
+  }
+  .campo-custom-row .btn-remove-contact { grid-row: auto; grid-column: auto; align-self: auto; }
+}

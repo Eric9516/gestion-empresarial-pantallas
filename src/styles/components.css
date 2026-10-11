@@ -1,0 +1,268 @@
+/* Tabla, modales, badges, cards, contactos, detalle, toast, rótulo
+   Mobile-first: las reglas sin @media son la base para pantallas chicas;
+   @media (min-width: ...) agrega/ajusta para pantallas más anchas. */
+
+/* ===== BADGES ===== */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-active { background: var(--success-bg); color: var(--success); }
+.badge-inactive { background: #f0f0f0; color: var(--text-muted); }
+.badge-rubro { background: color-mix(in srgb, var(--blue) 8%, transparent); color: var(--blue); }
+
+/* ===== TOOLTIP =====
+   .tooltip-bubble se porta a <body> y se posiciona con coordenadas reales
+   (position: fixed), para no quedar recortado por contenedores con
+   overflow:hidden como .table-wrap. */
+.tooltip-wrap { position: relative; display: inline-block; cursor: help; }
+.tooltip-bubble {
+  position: fixed;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 6px 10px;
+  border-radius: 6px;
+  max-width: 220px;
+  white-space: normal;
+  text-align: center;
+  z-index: 500;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+/* ===== TABLA =====
+   En mobile se muestran las tarjetas (.prov-cards) y se oculta la tabla; desde
+   769px es al revés. */
+.table-wrap {
+  display: none;
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+table { width: 100%; border-collapse: collapse; }
+thead { background: linear-gradient(90deg, var(--blue) 0%, var(--blue-mid) 100%); }
+th { padding: 10px 10px; text-align: left; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
+td { padding: 10px 10px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tbody tr { transition: background 0.15s; }
+tbody tr:hover { background: var(--surface2); }
+
+.td-actions { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.provider-name { font-weight: 700; color: var(--blue); font-size: 14px; }
+
+.contact-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 2px 8px;
+  font-size: 11px; font-weight: 600; color: var(--text-mid); margin: 2px;
+}
+
+/* ===== CARDS (mobile) ===== */
+.prov-cards { display: flex; flex-direction: column; gap: 10px; }
+
+.prov-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+}
+.prov-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.prov-card-name { font-size: 15px; font-weight: 700; color: var(--blue); flex: 1; margin-right: 8px; }
+.prov-card-body { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.prov-card-row { font-size: 13px; color: var(--text-mid); display: flex; gap: 6px; align-items: flex-start; }
+.prov-card-actions { display: flex; flex-wrap: wrap; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+
+/* ===== MODAL =====
+   En mobile el modal es un "cajón" pegado abajo, ancho completo; desde 769px
+   es la tarjeta centrada clásica. */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15,30,60,0.6);
+  z-index: 300;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  overflow-y: auto;
+  backdrop-filter: blur(4px);
+  overscroll-behavior: contain;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--white);
+  border-radius: 20px 20px 0 0;
+  padding: 18px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-overlay.open .modal {
+  animation: slideUp 0.25s ease forwards;
+  will-change: transform;
+  transform: translateZ(0);
+}
+/* .modal-lg solo importa en escritorio (ver @media al final) — en mobile el
+   modal siempre es ancho completo, sea "lg" o no. */
+
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid var(--border);
+}
+.modal-title { font-size: 17px; font-weight: 800; color: var(--blue); display: flex; align-items: center; gap: 10px; }
+.modal-title .accent { color: var(--red); }
+
+.btn-close {
+  background: var(--surface2); border: none; color: var(--text-muted);
+  font-size: 18px; cursor: pointer; width: 32px; height: 32px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; line-height: 1; flex-shrink: 0;
+}
+.btn-close:hover { background: var(--danger-bg); color: var(--danger); }
+
+.form-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.form-group.full { grid-column: 1 / -1; }
+
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 20px; padding-top: 16px;
+  border-top: 2px solid var(--border);
+  flex-wrap: wrap;
+}
+
+/* ===== CONTACTOS ===== */
+.contacts-section {
+  grid-column: 1 / -1;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  border: 1.5px solid var(--border);
+}
+.contacts-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.contacts-title { font-size: 13px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 0.5px; }
+
+.contact-row {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.contact-row-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.contact-row-grid .form-group { margin-bottom: 0; }
+
+.btn-remove-contact {
+  position: absolute; top: 8px; right: 8px;
+  background: none; border: none; color: var(--danger);
+  cursor: pointer; font-size: 16px; padding: 2px 6px;
+  border-radius: 4px; line-height: 1;
+}
+.btn-remove-contact:hover { background: var(--danger-bg); }
+
+/* ===== DETALLE ===== */
+/* Foto arriba y descripción debajo en mobile — así la grilla de abajo tiene
+   todo el ancho para acomodar 2 columnas en vez de apretarse a 1 (que se
+   veía con mucho espacio entre Familia y Subfamilia). En desktop, lado a
+   lado como antes. */
+.item-detail-top { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
+.item-detail-foto { width: 100%; max-width: 320px; margin: 0 auto; }
+
+.detail-section { margin-bottom: 20px; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.detail-item label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+.detail-item .value { font-size: 14px; font-weight: 600; color: var(--text); }
+
+.contacts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+
+.contact-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 14px; }
+.contact-card-name { font-weight: 700; color: var(--blue); margin-bottom: 4px; }
+.contact-card-cargo { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-bottom: 8px; }
+.contact-card-info { font-size: 13px; color: var(--text-mid); display: flex; flex-direction: column; gap: 3px; }
+
+/* ===== TOAST ===== */
+.toast {
+  position: fixed; bottom: 20px; right: 16px;
+  background: var(--white); border-radius: 10px;
+  padding: 12px 16px; font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+  z-index: 999; opacity: 0; transform: translateY(12px);
+  transition: all 0.25s; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  border-left: 4px solid var(--blue); max-width: 300px;
+  /* Aunque quede invisible (opacity:0), sigue ocupando su lugar fijo abajo a la
+     derecha y por defecto SIGUE recibiendo clics — tapaba en silencio cualquier
+     botón que cayera ahí debajo (ej: "Sí, confirmar retiro" en pantallas angostas)
+     apenas se mostraba el primer cartel. */
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { border-left-color: var(--success); }
+.toast.error { border-left-color: var(--danger); }
+
+/* ===== ESTADO VACÍO ===== */
+.empty-state { text-align: center; padding: 52px 20px; color: var(--text-muted); }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 17px; font-weight: 700; color: var(--text-mid); margin-bottom: 6px; }
+.empty-state p { font-size: 14px; }
+
+/* ===== RÓTULO — tamaños ===== */
+.size-btn {
+  padding: 7px 12px; border-radius: 20px;
+  border: 2px solid var(--border); background: var(--white);
+  cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 700;
+  color: var(--text-mid); transition: all 0.15s;
+}
+.size-btn.active { border-color: var(--blue); background: var(--blue); color: white; }
+
+/* ===== RÓTULO — modal grid ===== */
+.rotulo-modal-grid { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+
+/* ===== DESDE 769px: layout de escritorio ===== */
+@media (min-width: 769px) {
+  .table-wrap { display: block; }
+  .prov-cards { display: none; }
+
+  th { padding: 12px 14px; }
+  td { padding: 12px 14px; }
+  .td-actions { flex-wrap: nowrap; gap: 4px; }
+
+  .modal-overlay { align-items: flex-start; padding: 16px; }
+  .modal {
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 620px;
+    margin: auto;
+    max-height: calc(100vh - 32px);
+  }
+  .modal-lg { max-width: 780px; }
+  .form-grid { grid-template-columns: 1fr 1fr; }
+  .modal-footer { gap: 10px; }
+
+  .contact-row-grid { grid-template-columns: 1fr 1fr; }
+
+  .rotulo-modal-grid { grid-template-columns: 1fr 1fr; gap: 20px; }
+
+  .item-detail-top { flex-direction: row; flex-wrap: wrap; }
+  .item-detail-foto { max-width: 280px; margin: 0; }
+}

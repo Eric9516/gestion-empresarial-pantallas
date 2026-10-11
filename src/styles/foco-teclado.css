@@ -1,0 +1,18 @@
+/* Contorno que muestra dónde está el cursor al navegar con Tab. Solo aparece con
+   teclado (focus-visible): con el mouse no cambia nada. Sin capa, para que gane. */
+[role="button"]:focus-visible,
+[role="switch"]:focus-visible,
+.tooltip-wrap:focus-visible {
+  outline: 2px solid var(--blue-light);
+  outline-offset: 2px;
+}
+tr[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--blue-light);
+  outline-offset: -2px;
+}
+/* La ventana en sí recibe el foco al abrirse (para lectores de pantalla), pero no
+   debe dibujar contorno: lo importante es el campo o botón de adentro. */
+.modal:focus,
+.modal:focus-visible {
+  outline: none;
+}

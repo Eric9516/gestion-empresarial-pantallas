@@ -1,0 +1,30 @@
+/* Variables de la app. Va SIN capa (ver index.css): así ganan siempre sobre las
+   variables que genera Tailwind, que usa nombres parecidos (--radius-sm, --shadow-lg)
+   y las pisaría. */
+:root {
+  --blue: #1a3a6b;
+  --blue-mid: #1e4d9b;
+  --blue-light: #2d6bc4;
+  --red: #c8222a;
+  --red-light: #e03038;
+  --mant: #9a5b12;
+  --mant-mid: #c17a1e;
+  --white: #ffffff;
+  --bg: #f0f4f8;
+  --surface: #ffffff;
+  --surface2: #f7f9fc;
+  --border: #dde3ec;
+  --text: #1a2a3a;
+  --text-mid: #4a5568;
+  --text-muted: #8896a8;
+  --success: #1a7a4a;
+  --success-bg: #e6f4ec;
+  --danger: #c8222a;
+  --danger-bg: #fdecea;
+  --shadow: 0 2px 8px color-mix(in srgb, var(--blue) 8%, transparent);
+  --shadow-lg: 0 8px 32px color-mix(in srgb, var(--blue) 13%, transparent);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: 'Nunito', sans-serif;
+  --font-display: 'Playfair Display', serif;
+}
