@@ -4,6 +4,7 @@ dist
 *.local
 .env.*
 !.env.example
+datos-reales/
 .vscode/*
 .idea
 .DS_Store
