@@ -83,7 +83,7 @@ Con datos de ejemplo **inventados**, detrás de funciones `useAlgo()` (ver `CLAU
 - **`NOTAS-PARA-ERIC.md`**: lo que la base de datos tendrá que guardar para que las pantallas funcionen: tablas, columnas, relaciones, quién puede ver, crear, editar o borrar cada cosa, y qué opciones configurables hay. Se actualiza al terminar cada etapa.
 
 ## 6. Mapa del proyecto (para no empezar de cero)
-- **Pantallas del módulo hoy:** `src/pages/MantenimientoPage.tsx` (pestañas) y `src/features/reparaciones/` (envío de repuestos a reparar). Ya existe una tabla simple de equipos; **el módulo nuevo la reemplaza y amplía**.
+- **Pantallas del módulo hoy:** `src/pages/MantenimientoPage.tsx` (es la pantalla del Depósito, con sus pestañas). Las reparaciones (`src/features/reparaciones/`: envío de repuestos a reparar afuera) **no son parte de Mantenimiento: son del Depósito**; el módulo nuevo no las toca. Ya existe una tabla simple de equipos; **el módulo nuevo la reemplaza y amplía**.
 - **QR:** cómo se genera el de los repuestos, en `src/features/items/DescargarQrModal.tsx`; el escáner, en `src/features/scanner/`.
 - **PDF (etiquetas, informes):** `src/lib/generarRotuloPdf.ts` y similares (librería `jspdf`).
 - **Campos personalizables ya resueltos una vez:** mirá cómo se hace en la configuración de comisionistas (`src/features/admin/ComisionistasCamposPane.tsx`).

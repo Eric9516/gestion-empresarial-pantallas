@@ -87,6 +87,23 @@ export function useReparacionesQuery(activo: boolean) {
   });
 }
 
+// Qué envíos (notas de despacho) ya tienen asignados las reparaciones activas: grupo del envío (todas sus versiones) -> id de la reparación.
+// Una reparación eliminada deja libre su envío.
+export function useEnviosAsignadosQuery() {
+  return useQuery({
+    queryKey: [...QUERY_KEY, 'envios-asignados'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('reparaciones').select('id, rotulos_generados(grupo_id)').eq('activo', true).not('envio_id', 'is', null);
+      if (error) throw error;
+      const asignados = new Map<string, string>();
+      for (const r of data as unknown as { id: string; rotulos_generados: { grupo_id: string } | null }[]) {
+        if (r.rotulos_generados?.grupo_id) asignados.set(r.rotulos_generados.grupo_id, r.id);
+      }
+      return asignados;
+    },
+  });
+}
+
 export interface NuevaReparacionInput {
   proveedor_id: string;
   motivo: string;

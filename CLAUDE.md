@@ -52,5 +52,5 @@ Las tablas que ya existen se piden con el cliente de datos que ya usa la app (mi
 
 ## Datos útiles
 - Idioma de la interfaz: español (Argentina), fechas con `es-AR`.
-- Los módulos de la app se prenden y apagan por cliente; Mantenimiento ya existe como módulo (hoy: reparaciones). El módulo nuevo va dentro de Mantenimiento.
+- Los módulos de la app se prenden y apagan por cliente. Mantenimiento ya existe como módulo (hoy tiene solo una tabla simple de equipos). Las **reparaciones** (lo que se manda a reparar afuera) **no son de Mantenimiento**: son del Depósito. El módulo nuevo va dentro de Mantenimiento.
 - Las pruebas (`pnpm test`) son rápidas y no necesitan internet.

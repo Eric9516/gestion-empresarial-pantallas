@@ -30,19 +30,19 @@
       "id": "deposito",
       "nombre": "Depósito",
       "componente": "abastecimiento",
-      "descripcion": "Repuestos, stock, retiros, ajustes de inventario e informe de reposición. Los proveedores por repuesto necesitan además el módulo de proveedores.",
+      "descripcion": "Repuestos, stock, retiros, ajustes de inventario, informe de reposición y reparaciones (lo que se manda a reparar afuera). Las reparaciones y los proveedores por repuesto necesitan además el módulo de proveedores.",
       "requiere": [],
-      "bloquea": "repuestos, familias, stock, retiros, ajustes, sectores, planilla de familias y la carpeta de fotos de repuestos"
+      "bloquea": "repuestos, familias, stock, retiros, ajustes, sectores, planilla de familias, reparaciones y la carpeta de fotos de repuestos"
     },
     {
       "id": "mantenimiento",
       "nombre": "Mantenimiento",
       "componente": "mantenimiento",
-      "descripcion": "Equipos y reparaciones (después, manuales y despiece). Necesita el depósito para los repuestos; las reparaciones necesitan además proveedores.",
+      "descripcion": "Equipos y, más adelante, manuales, despiece y órdenes de trabajo. Necesita el depósito para los repuestos.",
       "requiere": [
         "deposito"
       ],
-      "bloquea": "equipos, repuestos por equipo, reparaciones y la carpeta de documentos"
+      "bloquea": "equipos, repuestos por equipo y la carpeta de documentos"
     },
     {
       "id": "tareas",

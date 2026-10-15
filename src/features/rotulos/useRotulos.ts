@@ -31,6 +31,22 @@ export function useRotulosQuery() {
   });
 }
 
+// Lo que se anotó en cada bulto de varios envíos a la vez (para reconocerlos en una lista): id del envío -> detalles.
+export function useDetallesDeEnviosQuery(ids: string[]) {
+  const key = [...ids].sort();
+  return useQuery({
+    queryKey: ['rotulos_bultos', 'detalles', key],
+    enabled: key.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('rotulos_bultos').select('rotulo_id, numero, detalle').in('rotulo_id', key).order('numero', { ascending: true });
+      if (error) throw error;
+      const porEnvio = new Map<string, string[]>();
+      for (const b of data) if (b.detalle) porEnvio.set(b.rotulo_id, [...(porEnvio.get(b.rotulo_id) ?? []), b.detalle]);
+      return porEnvio;
+    },
+  });
+}
+
 // "Creado por" en la pantalla de Envíos: solo trae los perfiles de los autores
 // que realmente aparecen en la lista cargada (igual criterio que Papelera).
 export function useRotuloAutoresQuery(ids: string[]) {

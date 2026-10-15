@@ -52,8 +52,8 @@ export function integraciones(m: Modulos) {
   return {
     // Proveedores por repuesto: salen del Depósito y necesitan un proveedor.
     depositoConProveedores: e.deposito && e.proveedores,
-    // Reparaciones: son de Mantenimiento, usan repuestos del Depósito y necesitan un proveedor.
-    reparaciones: e.mantenimiento && e.deposito && e.proveedores,
+    // Reparaciones (lo que se manda a reparar afuera): son del Depósito, usan sus repuestos y necesitan un proveedor.
+    reparaciones: e.deposito && e.proveedores,
     // Elegir un comisionista al armar un envío.
     enviosConComisionistas: e.envios && e.comisionistas,
   };

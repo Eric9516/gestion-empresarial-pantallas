@@ -81,9 +81,9 @@ describe('integraciones', () => {
     expect(integraciones({ ...todos(), proveedores: false }).depositoConProveedores).toBe(false);
     expect(integraciones({ ...todos(), deposito: false }).depositoConProveedores).toBe(false);
   });
-  it('las reparaciones necesitan Mantenimiento, Depósito y Proveedores', () => {
+  it('las reparaciones son del Depósito: necesitan Depósito y Proveedores, y no dependen de Mantenimiento', () => {
     expect(integraciones(todos()).reparaciones).toBe(true);
-    expect(integraciones({ ...todos(), mantenimiento: false }).reparaciones).toBe(false);
+    expect(integraciones({ ...todos(), mantenimiento: false }).reparaciones).toBe(true);
     expect(integraciones({ ...todos(), deposito: false }).reparaciones).toBe(false);
     expect(integraciones({ ...todos(), proveedores: false }).reparaciones).toBe(false);
   });
