@@ -64,7 +64,7 @@
   background: var(--blue); color: white; font-family: var(--font-display);
   font-size: 28px; width: 80px; height: 80px; border-radius: 50%;
 }
-.auth-title { text-align: center; font-size: 22px; font-weight: 800; color: var(--blue); margin-bottom: 4px; }
+.auth-title { text-align: center; font-size: 22px; font-weight: 800; color: var(--blue); margin: 0 0 4px; }
 .auth-subtitle { text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 28px; font-weight: 500; }
 .auth-error { background: var(--danger-bg); color: var(--danger); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; font-weight: 600; margin-bottom: 16px; text-align: center; }
 
@@ -73,17 +73,17 @@
    que se le agregaba .visible a mano. Acá cada pantalla es una ruta/componente de
    React que solo existe montada cuando corresponde, así que no hace falta la
    lógica de mostrar/ocultar — dejamos solo el layout (flex en columna). */
-.app-screen, .mantenimiento-screen, .admin-screen { display: flex; min-height: 100vh; flex-direction: column; }
+.app-screen, .deposito-screen, .admin-screen { display: flex; min-height: 100vh; flex-direction: column; }
 
-.mantenimiento-screen .app-header { background: linear-gradient(90deg, var(--mant) 0%, var(--mant-mid) 100%); box-shadow: 0 2px 12px rgba(154,91,18,0.25); }
-.mantenimiento-screen .nav-tab.active { color: var(--mant-mid); border-bottom-color: var(--mant); }
-.mantenimiento-screen .nav-tab:hover { color: var(--mant-mid); }
+.deposito-screen .app-header { background: linear-gradient(90deg, var(--deposito) 0%, var(--deposito-mid) 100%); box-shadow: 0 2px 12px rgba(154,91,18,0.25); }
+.deposito-screen .nav-tab.active { color: var(--deposito); border-bottom-color: var(--deposito); }
+.deposito-screen .nav-tab:hover { color: var(--deposito); }
 
 .admin-screen .app-header { background: linear-gradient(90deg, #374151 0%, #4b5563 100%); box-shadow: 0 2px 12px rgba(30,35,45,0.25); }
 
 .loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-weight: 600; }
 
-.btn-mantenimiento {
+.btn-deposito {
   display: none; align-items: center; gap: 6px;
   background: rgba(255,255,255,0.14);
   color: white; font-size: 13px; font-weight: 700;
@@ -91,7 +91,7 @@
   cursor: pointer; border: none; transition: background 0.2s;
   text-decoration: none;
 }
-.btn-mantenimiento:hover { background: rgba(255,255,255,0.26); }
+.btn-deposito:hover { background: rgba(255,255,255,0.26); }
 
 .btn-volver-directorio {
   display: none; align-items: center; gap: 6px;
@@ -114,12 +114,12 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--mant);
+  background: var(--deposito);
   color: white;
   border: none;
   font-size: 22px;
   cursor: pointer;
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--mant) 40%, transparent);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--deposito) 40%, transparent);
   z-index: 140;
   transition: all 0.2s;
   align-items: center;
@@ -154,7 +154,7 @@
    de Admin, que nunca tuvieron este filtro. */
 .header-logo img { height: 34px; object-fit: contain; }
 .header-logo-fallback { color: white; font-family: var(--font-display); font-size: 20px; font-weight: 700; }
-.header-title { display: none; color: rgba(255,255,255,0.75); font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+.header-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; color: rgba(255,255,255,0.75); font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
 .header-right { display: flex; align-items: center; gap: 12px; }
 .hide-mobile { display: none; }
 
@@ -297,7 +297,7 @@
 /* ===== DESDE 769px: layout de escritorio ===== */
 @media (min-width: 769px) {
   .app-header { padding: 0 24px; }
-  .header-title { display: block; }
+  .header-title { position: static; width: auto; height: auto; overflow: visible; clip: auto; display: block; }
   .hide-mobile { display: inline; }
   .user-badge { display: flex; }
   .app-nav { display: flex; }

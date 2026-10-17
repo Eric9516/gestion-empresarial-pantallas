@@ -1,10 +1,12 @@
 import { clicConTeclado } from '@/lib/clicConTeclado';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
 import Modal from '../../components/Modal';
 import Tooltip from '../../components/Tooltip';
+import BotonVerMas from '../../components/BotonVerMas';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import ResponsiveList, { type Column } from '../../components/ResponsiveList';
 import {
   useDeleteHistorialItem, useExportarRetirosPendientes, useHistorialRetirosQuery, useUpdateHistorialCantidad, type RetiroHistorial,
@@ -68,7 +70,8 @@ export default function HistorialRetiros() {
   const [diasAbiertos, setDiasAbiertos] = useState<Set<string>>(() => new Set([hoy]));
   const [retirosAbiertos, setRetirosAbiertos] = useState<Set<string>>(new Set());
 
-  const { retiros, admin, usuarios, isLoading, isError } = useHistorialRetirosQuery(fechaFiltro, usuarioFiltro);
+  const busquedaConPausa = useDebouncedValue(busqueda, 300);
+  const { retiros, admin, usuarios, isLoading, isError, hayMas, cargandoMas, verMas, buscando } = useHistorialRetirosQuery(fechaFiltro, usuarioFiltro, busquedaConPausa);
   const updateCantidad = useUpdateHistorialCantidad();
   const deleteItemMut = useDeleteHistorialItem();
   const exportarPendientes = useExportarRetirosPendientes();
@@ -78,12 +81,16 @@ export default function HistorialRetiros() {
   const [devolviendo, setDevolviendo] = useState<FilaHistorial | null>(null);
   const [devolverInput, setDevolverInput] = useState('1');
 
+  // La hora actual, que se renueva cada minuto: de ella depende si un retiro sigue "abierto" (dentro de las 24 horas) o ya está cerrado.
+  const [ahora, setAhora] = useState(() => new Date().getTime());
+  useEffect(() => { const t = window.setInterval(() => setAhora(new Date().getTime()), 60_000); return () => window.clearInterval(t); }, []);
+
   const usuariosPorId = useMemo(() => Object.fromEntries(usuarios.map(u => [u.id, u])), [usuarios]);
 
   function resumenDeRetiro(r: RetiroHistorial) {
     const u = admin ? usuariosPorId[r.usuario_id] : null;
     const usuarioNombre = u ? (`${u.nombre || ''} ${u.apellido || ''}`.trim() || u.email || '') : '';
-    const dentroDe24h = Date.now() - new Date(r.created_at).getTime() < VENTANA_DEVOLUCION_MS;
+    const dentroDe24h = ahora - new Date(r.created_at).getTime() < VENTANA_DEVOLUCION_MS;
     const canEdit = admin || (r.usuario_id === profile?.id && dentroDe24h);
     const estado: 'Abierto' | 'Cerrado' = dentroDe24h ? 'Abierto' : 'Cerrado';
     return { usuarioNombre, sector: r.sectores?.nombre ?? '—', canEdit, estado };
@@ -99,18 +106,8 @@ export default function HistorialRetiros() {
     }));
   }
 
-  const retirosFiltrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    if (!q) return retiros;
-    return retiros.filter(r => {
-      const { usuarioNombre, sector } = resumenDeRetiro(r);
-      const matchUsuario = usuarioNombre.toLowerCase().includes(q);
-      const matchSector = sector.toLowerCase().includes(q);
-      const matchItem = r.retiro_items.some(ri => [ri.items?.codigo, ri.items?.descripcion].some(v => v?.toLowerCase().includes(q)));
-      return matchUsuario || matchSector || matchItem;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retiros, busqueda, admin, usuariosPorId]);
+  // La búsqueda, la fecha y el usuario los filtra la base: acá llegan ya filtrados.
+  const retirosFiltrados = retiros;
 
   const grupos = useMemo(() => groupByDay(retirosFiltrados), [retirosFiltrados]);
 
@@ -239,7 +236,7 @@ export default function HistorialRetiros() {
           <table>
             <thead>
               <tr>
-                <th></th>
+                <th><span className="sr-only">Detalle</span></th>
                 <th>Fecha</th>
                 {admin && <th>Usuario</th>}
                 <th>Sector</th>
@@ -255,9 +252,15 @@ export default function HistorialRetiros() {
                 const totalCantidad = r.retiro_items.reduce((s, ri) => s + ri.cantidad, 0);
                 return (
                   <Fragment key={r.id}>
-                    <tr style={{ cursor: 'pointer' }} aria-expanded={abierto} {...clicConTeclado(() => toggleRetiro(r.id), null)}>
+                    <tr style={{ cursor: 'pointer' }} onClick={() => toggleRetiro(r.id)}>
                       <td style={{ width: 28 }}>
-                        <span style={{ display: 'inline-block', transition: 'transform 0.15s', transform: abierto ? 'rotate(90deg)' : 'none' }}><Icono n="desplegar" /></span>
+                        <button
+                          type="button"
+                          aria-expanded={abierto}
+                          aria-label={abierto ? 'Ocultar el detalle del retiro' : 'Ver el detalle del retiro'}
+                          onClick={e => { e.stopPropagation(); toggleRetiro(r.id); }}
+                          style={{ display: 'inline-flex', background: 'none', border: 0, padding: 0, cursor: 'pointer', color: 'inherit', transition: 'transform 0.15s', transform: abierto ? 'rotate(90deg)' : 'none' }}
+                        ><Icono n="desplegar" /></button>
                       </td>
                       <td>{fechaHora}</td>
                       {admin && <td>{usuarioNombre}</td>}
@@ -354,17 +357,17 @@ export default function HistorialRetiros() {
         <div className="search-wrap">
           <Input type="text" placeholder="Buscar por repuesto, sector u operario..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
         </div>
-        <Input type="date" value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)} style={{ maxWidth: 200 }} />
+        <Input type="date" aria-label="Fecha" value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)} style={{ maxWidth: 200 }} />
         <Button variant="ghost" size="sm" onClick={() => setFechaFiltro('')}>Ver últimos 30 días</Button>
         {admin && (
-          <Select className="filter-select" value={usuarioFiltro} onChange={e => setUsuarioFiltro(e.target.value)}>
+          <Select className="filter-select" aria-label="Filtrar por usuario" value={usuarioFiltro} onChange={e => setUsuarioFiltro(e.target.value)}>
             <option value="">Todos los usuarios</option>
             {[...usuarios].sort((a, b) => (a.nombre || a.email || '').localeCompare(b.nombre || b.email || '')).map(u => (
               <option key={u.id} value={u.id}>{`${u.nombre || ''} ${u.apellido || ''}`.trim() || u.email}</option>
             ))}
           </Select>
         )}
-        <Select className="filter-select" value={vista} onChange={e => setVista(e.target.value as Vista)}>
+        <Select className="filter-select" aria-label="Forma de ver los retiros" value={vista} onChange={e => setVista(e.target.value as Vista)}>
           <option value="tabla">Vista tabla</option>
           <option value="dias">Vista por día</option>
         </Select>
@@ -373,23 +376,25 @@ export default function HistorialRetiros() {
       {isLoading && <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>}
       {isError && <p style={{ color: 'var(--danger)' }}>Error al cargar el historial.</p>}
 
-      {!isLoading && !isError && !retiros.length && (
+      {!isLoading && !isError && !buscando && !retiros.length && !busqueda.trim() && !fechaFiltro && !usuarioFiltro && (
         <div className="empty-state">
           <div className="empty-icon"><Icono n="lista" /></div>
-          <h3>Todavía no hay retiros</h3>
+          <h2>Todavía no hay retiros</h2>
           <p>Los que confirmes van a aparecer acá.</p>
         </div>
       )}
 
-      {!isLoading && !isError && !!retiros.length && !retirosFiltrados.length && (
+      {!isLoading && !isError && !buscando && !retiros.length && (!!busqueda.trim() || !!fechaFiltro || !!usuarioFiltro) && (
         <div className="empty-state">
           <div className="empty-icon"><Icono n="buscar" /></div>
-          <h3>Sin resultados</h3>
-          <p>Probá con otro código, sector u operario.</p>
+          <h2>Sin resultados</h2>
+          <p>Probá con otro código, sector, operario o fecha.</p>
         </div>
       )}
+      {!isLoading && !isError && buscando && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}><Icono n="buscar" /> Buscando...</p>}
 
       {!isLoading && !isError && !!retirosFiltrados.length && (vista === 'tabla' ? renderVistaTabla() : renderVistaDias())}
+      {!isLoading && !isError && <BotonVerMas hayMas={hayMas} cargando={cargandoMas} mostrando={retiros.length} onClick={verMas} />}
 
       <ExportarPeriodoModal open={exportarPeriodoOpen} onClose={() => setExportarPeriodoOpen(false)} />
 

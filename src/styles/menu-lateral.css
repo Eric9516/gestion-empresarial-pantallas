@@ -1,0 +1,72 @@
+/* ===== MENÚ LATERAL (escritorio) =====
+   Franja de íconos pegada al borde izquierdo (debajo del encabezado y hasta abajo), por encima de la pantalla, y se ensancha por encima al acercar el mouse.
+   No ocupa ancho: el contenido usa toda la pantalla. Solo crece hacia el costado (alto fijo).
+   Toma el color de cada módulo (--menu-acento) y deja los íconos de colores, como las pestañas de antes.
+   En el celular no existe: ahí navega el menú de la hamburguesa (mobile.css). */
+.app-screen { --menu-acento: var(--blue); }
+.deposito-screen { --menu-acento: var(--deposito); }
+.admin-screen { --menu-acento: #374151; }
+
+.menu-lateral { display: none; }
+
+/* El encabezado dice en qué se está (el área o el nombre del depósito), debajo del nombre de la empresa, también en el celular. */
+.con-menu-lateral .header-title { position: static; width: auto; height: auto; overflow: visible; clip: auto; display: block; }
+
+@media (min-width: 769px) {
+  .menu-lateral {
+    display: flex; flex-direction: column;
+    position: fixed; left: 0; top: 60px; bottom: 0; width: 45px; z-index: 90;
+    padding: 6px 0; overflow: hidden;
+    border-right: 1px solid var(--border); border-radius: 0 16px 16px 0;
+    background: rgba(255, 255, 255, 0.88);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    box-shadow: 6px 0 24px color-mix(in srgb, var(--blue) 10%, transparent);
+    transition: width 0.2s ease-out;
+  }
+  .menu-lateral.abierto { width: 250px; }
+
+  .menu-lateral-medio { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+  .menu-lateral-medio::-webkit-scrollbar { display: none; }
+  .menu-lateral-pie { border-top: 1px solid var(--border); margin: 4px 0 0; padding-top: 4px; }
+
+  /* Cerrada, la franja mide 45 (44 de adentro + el borde); cada botón mide 36 con 4 de margen y el ícono (20) queda justo al medio: (36 - 20) / 2 = 8 de relleno. */
+  .menu-lateral-item {
+    position: relative; display: flex; align-items: center; gap: 14px; width: calc(100% - 8px);
+    height: 38px; margin: 0 4px; padding: 0 8px; border: none; border-radius: 9px;
+    background: none; color: var(--text-mid); font-family: var(--font); font-size: 14px; font-weight: 700;
+    white-space: nowrap; text-align: left; cursor: pointer; overflow: hidden;
+  }
+  .menu-lateral-item:hover { background: color-mix(in srgb, var(--menu-acento) 9%, transparent); color: var(--menu-acento); }
+  .menu-lateral-item.activo { background: color-mix(in srgb, var(--menu-acento) 15%, transparent); color: var(--menu-acento); }
+  .menu-lateral-icono { display: inline-flex; flex: none; width: 20px; justify-content: center; font-size: 20px; }
+  .menu-lateral-texto { opacity: 0; transition: opacity 0.15s; }
+  .menu-lateral.abierto .menu-lateral-texto { opacity: 1; }
+
+  .menu-lateral-cant {
+    position: absolute; top: 2px; left: 22px; min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
+  }
+
+  /* El rótulo de cada grupo ocupa siempre el mismo alto: abierto muestra el nombre; cerrado, una línea. Así nada salta al abrir. */
+  .menu-lateral-grupo { position: relative; height: 26px; padding: 0 12px; display: flex; align-items: flex-end; }
+  .menu-lateral-grupo span { opacity: 0; transition: opacity 0.15s; padding-bottom: 3px; font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+  .menu-lateral.abierto .menu-lateral-grupo span { opacity: 1; }
+  .menu-lateral-grupo::after { content: ''; position: absolute; left: 10px; right: 10px; top: 50%; height: 1px; background: var(--border); transition: opacity 0.15s; }
+  .menu-lateral.abierto .menu-lateral-grupo::after { opacity: 0; }
+  .menu-lateral-grupo.primero::after { display: none; }
+
+  /* Fijo: se queda abierto y el contenido se corre para no quedar tapado. */
+  .menu-lateral.fijo { width: 250px; }
+  .con-menu-lateral.menu-fijo .app-main { padding-left: 270px; max-width: 1560px; }
+
+  /* En pantallas que no tienen margen libre a los costados, el contenido deja lugar para que la franja no tape el borde. */
+  .con-menu-lateral:not(.menu-fijo) .app-main { padding-left: 62px; }
+}
+
+@media (min-width: 1420px) {
+  .con-menu-lateral:not(.menu-fijo) .app-main { padding-left: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-lateral, .menu-lateral-texto, .menu-lateral-grupo span, .menu-lateral-grupo::after { transition: none; }
+}

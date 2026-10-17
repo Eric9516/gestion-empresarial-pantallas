@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import { useToast } from '../../components/ToastProvider';
 import { useCamposCustomQuery, type CampoCustom } from '../config/useCamposCustom';
 import { useSaveCamposCustom } from '../config/useConfiguracion';
@@ -22,7 +23,7 @@ export default function ComisionistasCamposPane() {
   const [campos, setCampos] = useState<CampoCustom[]>([]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (camposCustom) setCampos(camposCustom); }, [camposCustom]);
+  useAlCambiar([camposCustom], () => { if (camposCustom) setCampos(camposCustom); });
 
   function addRow() {
     setCampos(prev => [...prev, { id: `custom_${Date.now()}`, label: '', tipo: 'text' }]);
@@ -62,7 +63,7 @@ export default function ComisionistasCamposPane() {
         {campos.map((campo, i) => (
           <div className="campo-custom-row" key={campo.id}>
             <Input type="text" className="cc-label" placeholder="Nombre del campo" value={campo.label} onChange={e => updateRow(i, { label: e.target.value })} />
-            <Select className="cc-tipo" value={campo.tipo} onChange={e => updateRow(i, { tipo: e.target.value as CampoCustom['tipo'] })}>
+            <Select className="cc-tipo" aria-label="Tipo de campo" value={campo.tipo} onChange={e => updateRow(i, { tipo: e.target.value as CampoCustom['tipo'] })}>
               {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </Select>
             <button className="btn-remove-contact" onClick={() => removeRow(i)} title="Eliminar campo"><Icono n="cerrar" /></button>

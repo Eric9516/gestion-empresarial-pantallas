@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import SizeSelector from '../../components/SizeSelector';
 import { useToast } from '../../components/ToastProvider';
@@ -57,7 +58,7 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
   const [descargas, setDescargas] = useState<RotuloGuardado | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  useAlCambiar([open, editingId, editData], () => {
     if (!open) return;
     setDescargas(null);
     setMotivo('');
@@ -77,7 +78,7 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
       setW(21); setH(29.7); setComisionistaId(''); setTipoDoc(''); setNumDoc('');
       setValorDeclarado(''); setBultoTotal(1); setBultosDetalle(['']); setExtra('');
     }
-  }, [open, editingId, editData]);
+  });
 
   function handleBultoTotalChange(n: number) {
     const total = Math.max(1, n || 1);

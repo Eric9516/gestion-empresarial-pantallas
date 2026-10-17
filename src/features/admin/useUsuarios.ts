@@ -33,6 +33,7 @@ export type UsuarioInput = {
   puede_resetear_contrasenas: boolean;
   puede_ver_sugerencias: boolean;
   puede_ajustar_inventario: boolean;
+  puede_gestionar_depositos: boolean;
 };
 
 const QUERY_KEY = ['usuarios_perfil'] as const;

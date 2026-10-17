@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { mensajeDeError } from '@/lib/errores';
+import { ConflictoDeEdicion } from '../../lib/conflicto';
 
 interface Props {
   open: boolean;
@@ -52,10 +53,12 @@ export default function ComisionistaForm({ open, onClose, comisionista }: Props)
 
   async function onSubmit(values: ComisionistaFormValues) {
     try {
-      await saveComisionista.mutateAsync({ id: comisionista?.id ?? null, data: values });
+      await saveComisionista.mutateAsync({ id: comisionista?.id ?? null, data: values, version: comisionista ? comisionista.updated_at : undefined });
       toast(comisionista ? 'Comisionista actualizado' : 'Comisionista agregado', 'success');
       onClose();
     } catch (e) {
+      // Si alguien lo cambió mientras se editaba, se cierra para volver a abrirlo con lo nuevo (la lista ya se está actualizando).
+      if (e instanceof ConflictoDeEdicion) { toast(mensajeDeError(e), 'error'); onClose(); return; }
       toast('Error al guardar: ' + mensajeDeError(e), 'error');
     }
   }

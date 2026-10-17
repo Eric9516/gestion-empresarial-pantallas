@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analizarNumeros, filtrarOpciones, normalizarTexto, numeroConCeros, repuestoConNumero, type RepuestoNumerado } from './numeracion';
+import { HUECOS_VISIBLES, analizarNumeros, filtrarOpciones, normalizarTexto, numeroConCeros, repuestoConNumero, type RepuestoNumerado } from './numeracion';
 
 const r = (numero: string, descripcion: string | null = 'algo', id = numero): RepuestoNumerado => ({ id, codigo: `MABPU${numero.padStart(5, '0')}`, numero, descripcion });
 
@@ -34,7 +34,7 @@ describe('filtrarOpciones', () => {
 
 describe('analizarNumeros', () => {
   it('sin repuestos, empieza por 00001', () => {
-    expect(analizarNumeros([])).toEqual({ siguiente: '00001', ultimo: null, enBlanco: [] });
+    expect(analizarNumeros([])).toEqual({ siguiente: '00001', ultimo: null, enBlanco: [], huecos: [], totalHuecos: 0 });
   });
   it('sugiere el siguiente al más alto, con ceros', () => {
     const a = analizarNumeros([r('00001'), r('00002'), r('00012')]);
@@ -59,6 +59,44 @@ describe('analizarNumeros', () => {
   });
   it('ignora números que no son números', () => {
     expect(analizarNumeros([r('abc'), r('00003')]).siguiente).toBe('00004');
+  });
+});
+
+describe('analizarNumeros: números libres en el medio (huecos)', () => {
+  it('avisa del que falta entre dos usados', () => {
+    const a = analizarNumeros([r('00001'), r('00002'), r('00004')]);
+    expect(a.huecos).toEqual(['00003']);
+    expect(a.totalHuecos).toBe(1);
+    expect(a.siguiente).toBe('00005'); // el sugerido por defecto no cambia
+  });
+  it('el 1 también cuenta si nunca se usó', () => {
+    expect(analizarNumeros([r('00002'), r('00004')]).huecos).toEqual(['00001', '00003']);
+  });
+  it('sin huecos si los números son seguidos, y sin repuestos tampoco', () => {
+    expect(analizarNumeros([r('00001'), r('00002'), r('00003')]).totalHuecos).toBe(0);
+    expect(analizarNumeros([]).huecos).toEqual([]);
+  });
+  it('entiende números guardados sin ceros', () => {
+    expect(analizarNumeros([r('2'), r('4')]).huecos).toEqual(['00001', '00003']);
+  });
+  it('un número usado por un repuesto sin descripción no es un hueco (ya está ocupado)', () => {
+    expect(analizarNumeros([r('00001'), r('00002', ''), r('00004')]).huecos).toEqual(['00003']);
+  });
+  it('con muchos huecos trae solo los primeros pero cuenta todos', () => {
+    const a = analizarNumeros([r('00100')]);
+    expect(a.totalHuecos).toBe(99);
+    expect(a.huecos).toHaveLength(HUECOS_VISIBLES);
+    expect(a.huecos[0]).toBe('00001');
+    expect(a.huecos[HUECOS_VISIBLES - 1]).toBe(numeroConCeros(HUECOS_VISIBLES));
+  });
+  it('ignora lo que no es número', () => {
+    expect(analizarNumeros([r('abc'), r('00003')]).huecos).toEqual(['00001', '00002']);
+  });
+  it('el peor caso (el último número posible) se calcula al instante', () => {
+    const antes = performance.now();
+    const a = analizarNumeros([r('99999')]);
+    expect(a.totalHuecos).toBe(99998);
+    expect(performance.now() - antes).toBeLessThan(250);
   });
 });
 

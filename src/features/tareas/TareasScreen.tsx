@@ -137,7 +137,7 @@ export default function TareasScreen() {
         visibles.length === 0 ? (
           <div className="tareas-empty">
             <div className="tareas-empty-icon">{emptyMsg.icon}</div>
-            <h3>{emptyMsg.title}</h3>
+            <h2>{emptyMsg.title}</h2>
             <p>{emptyMsg.desc}</p>
           </div>
         ) : (

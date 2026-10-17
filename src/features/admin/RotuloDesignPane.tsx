@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
 import SizeSelector from '../../components/SizeSelector';
@@ -61,12 +62,12 @@ export default function RotuloDesignPane() {
   const [pie, setPie] = useState('');
   const [size, setSize] = useState({ w: 21, h: 29.7 });
 
-  useEffect(() => {
+  useAlCambiar([config], () => {
     if (!config) return;
     setRd(getCurrentDesign(config.rotulo_design));
     setCampos(getCurrentCampos(config.rotulo_campos));
     setPie(config.rotulo_pie || '');
-  }, [config]);
+  });
 
   function patch(p: Partial<RotuloDesign>) {
     setRd(prev => ({ ...prev, ...p }));

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useModulos } from '../config/useModulos';
 import { mensajeDeError } from '@/lib/errores';
+import { LARGO_MINIMO_CLAVE } from '../perfil/permisos';
 import { Icono } from '@/components/Icono';
 
 interface Props {
@@ -22,7 +24,7 @@ interface Props {
 const emptyInput: UsuarioInput = {
   nombre: '', apellido: '', email: '', rol: 'user', mantenimiento_rol: null,
   puede_ver_retiros: false, puede_ver_errores: false, puede_resetear_contrasenas: false,
-  puede_ver_sugerencias: false, puede_ajustar_inventario: false,
+  puede_ver_sugerencias: false, puede_ajustar_inventario: false, puede_gestionar_depositos: false,
 };
 
 export default function UsuarioForm({ open, onClose, usuario }: Props) {
@@ -44,7 +46,7 @@ export default function UsuarioForm({ open, onClose, usuario }: Props) {
 
   const esUnoMismo = usuario?.id === profile?.id;
 
-  useEffect(() => {
+  useAlCambiar([open, usuario], () => {
     if (!open) return;
     setPassword('');
     setInput(usuario
@@ -56,9 +58,10 @@ export default function UsuarioForm({ open, onClose, usuario }: Props) {
         puede_resetear_contrasenas: usuario.puede_resetear_contrasenas === true,
         puede_ver_sugerencias: usuario.puede_ver_sugerencias === true,
         puede_ajustar_inventario: usuario.puede_ajustar_inventario === true,
+        puede_gestionar_depositos: usuario.puede_gestionar_depositos === true,
       }
       : emptyInput);
-  }, [open, usuario]);
+  });
 
   // Al subir a Administrador del Depósito se tilda "ver los retiros de todos"
   // (se puede destildar); al desactivar o bajar a Usuario, se destilda.
@@ -80,7 +83,7 @@ export default function UsuarioForm({ open, onClose, usuario }: Props) {
     const datos = { ...input, puede_ver_retiros: input.mantenimiento_rol !== null && input.puede_ver_retiros };
     try {
       if (!usuario) {
-        if (!password || password.length < 6) { toast('La contraseña debe tener al menos 6 caracteres', 'error'); setSaving(false); return; }
+        if (!password || password.length < LARGO_MINIMO_CLAVE) { toast(`La contraseña debe tener al menos ${LARGO_MINIMO_CLAVE} caracteres`, 'error'); setSaving(false); return; }
         await createUsuario.mutateAsync({ input: datos, password });
         toast('Usuario creado', 'success');
       } else {
@@ -153,7 +156,7 @@ export default function UsuarioForm({ open, onClose, usuario }: Props) {
             <div className="form-group"><label htmlFor="usuario-form-2">Apellido</label><Input id="usuario-form-2" value={input.apellido} onChange={e => setInput(v => ({ ...v, apellido: e.target.value }))} /></div>
             <div className={`form-group${usuario ? ' full' : ''}`}><label htmlFor="usuario-form-3">Email</label><Input id="usuario-form-3" type="email" value={input.email} disabled={!!usuario} onChange={e => setInput(v => ({ ...v, email: e.target.value }))} /></div>
             {!usuario && (
-              <div className="form-group"><label htmlFor="usuario-form-4">Contraseña</label><Input id="usuario-form-4" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" /></div>
+              <div className="form-group"><label htmlFor="usuario-form-4">Contraseña</label><Input id="usuario-form-4" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={`Mínimo ${LARGO_MINIMO_CLAVE} caracteres`} /></div>
             )}
             <div className="form-group">
               <label htmlFor="usuario-form-5">Rol en Directorio</label>
@@ -204,6 +207,17 @@ export default function UsuarioForm({ open, onClose, usuario }: Props) {
             </div>
           )}
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-mid)', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '4px 0 10px' }}>Permisos del panel de Configuración</div>
+          {modulos.deposito && (
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
+                <input type="checkbox" checked={input.puede_gestionar_depositos} disabled={esUnoMismo} onChange={e => setInput(v => ({ ...v, puede_gestionar_depositos: e.target.checked }))} />
+                Puede crear y editar depósitos
+              </label>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0 24px' }}>
+                Configuración → Depósito → Depósitos: crear depósitos (hasta el tope del plan) y cambiarles el nombre, el color, el ícono o la letra. Solo un dueño da este permiso.
+              </p>
+            </div>
+          )}
           <div className="form-group">
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
               <input type="checkbox" checked={input.puede_ver_errores} disabled={esUnoMismo} onChange={e => setInput(v => ({ ...v, puede_ver_errores: e.target.checked }))} />

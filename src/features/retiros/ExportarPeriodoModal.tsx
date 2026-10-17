@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useExportarRetirosPeriodo } from './useRetiros';
@@ -19,7 +20,7 @@ export default function ExportarPeriodoModal({ open, onClose }: Props) {
   const [hasta, setHasta] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (open) { setDesde(''); setHasta(''); } }, [open]);
+  useAlCambiar([open], () => { if (open) { setDesde(''); setHasta(''); } });
 
   async function handleExportar() {
     if (!desde || !hasta) { toast('Elegí las dos fechas', 'error'); return; }

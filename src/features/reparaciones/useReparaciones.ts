@@ -124,7 +124,8 @@ export function useCrearReparacion() {
         // SQL acepta NULL sin problema (envío opcional) — es una imprecisión
         // conocida del generador de tipos con parámetros uuid sin default.
         p_envio_id: input.envio_id as unknown as string,
-        p_items: input.items,
+        // Siempre en el mismo orden (por repuesto): dos reparaciones a la vez con los mismos repuestos no se traban entre sí.
+        p_items: [...input.items].sort((a, b) => a.item_id.localeCompare(b.item_id)),
       });
       if (error) throw error;
       return data;

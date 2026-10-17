@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { isDirectorioDesactivado, tieneAccesoMantenimiento } from '../lib/types';
+import { isDirectorioDesactivado, tieneAccesoAdmin, tieneAccesoDeposito } from '../lib/types';
 import UserMenu from '../components/UserMenu';
 import MobileMenu from '../components/MobileMenu';
+import MenuLateral from '../components/MenuLateral';
+import type { SeccionMenu } from '../components/MenuLateral';
+import BotonHamburguesa from '../components/BotonHamburguesa';
+import { useMenuFijo } from '../lib/useMenuFijo';
+import { useAvisos } from '../features/avisos/useAvisos';
 import SinModulos from '../components/SinModulos';
 import { useConfiguracionQuery } from '../features/config/useConfiguracion';
 import { useModulos } from '../features/config/useModulos';
+import { useDepositoVisible } from '../features/depositos/useDepositos';
 import ProveedoresList from '../features/proveedores/ProveedoresList';
 import ComisionistasList from '../features/comisionistas/ComisionistasList';
 import RotulosScreen from '../features/rotulos/RotulosScreen';
@@ -20,7 +26,7 @@ type Tab = 'proveedores' | 'comisionistas' | 'rotulos' | 'tareas';
 // esta pantalla en absoluto.
 export default function DirectorioPage() {
   const { profile } = useAuth();
-  if (isDirectorioDesactivado(profile)) return <Navigate to="/mantenimiento" replace />;
+  if (isDirectorioDesactivado(profile)) return <Navigate to="/deposito" replace />;
   return <DirectorioContent />;
 }
 
@@ -29,8 +35,11 @@ function DirectorioContent() {
   const navigate = useNavigate();
   const { data: config } = useConfiguracionQuery();
   const { modulos, listo } = useModulos();
+  const depositoVisible = useDepositoVisible();
   const [tabElegida, setTabElegida] = useState<Tab>('proveedores');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuFijo, alternarMenuFijo] = useMenuFijo();
+  const { sugerencias: sugerenciasNuevas, total: avisosTotal } = useAvisos();
 
   const nombreEmpresa = config?.empresa_nombre || 'Mi Empresa';
 
@@ -46,44 +55,45 @@ function DirectorioContent() {
     ...(modulos.tareas ? [{ id: 'tareas' as const, icon: <Icono n="exito" />, label: 'Tareas' }] : []),
   ];
   const tab = pestañas.some(p => p.id === tabElegida) ? tabElegida : pestañas[0]?.id;
-  const puedeIrAlDeposito = modulos.deposito && tieneAccesoMantenimiento(profile);
+  const puedeIrAlDeposito = modulos.deposito && tieneAccesoDeposito(profile);
 
   if (!listo) return <div className="loading-screen">Cargando...</div>;
-  if (!tab) return puedeIrAlDeposito ? <Navigate to="/mantenimiento" replace /> : <SinModulos />;
+  if (!tab) return puedeIrAlDeposito ? <Navigate to="/deposito" replace /> : <SinModulos />;
+
+  const itemDe = (p: (typeof pestañas)[number]) => ({ clave: p.id, icono: p.icon, titulo: p.label, onClick: () => setTabElegida(p.id), activo: tab === p.id });
+  const secciones: SeccionMenu[] = [
+    { titulo: 'Directorio', items: pestañas.filter(p => p.id !== 'tareas').map(itemDe) },
+    { titulo: 'Gestión', items: pestañas.filter(p => p.id === 'tareas').map(itemDe) },
+  ].filter(s => s.items.length > 0);
+  // Las áreas a las que puede ir esta persona (si tiene una sola, no hace falta mostrarlas).
+  const areas: SeccionMenu[] = puedeIrAlDeposito ? [{ titulo: 'Áreas', items: [
+    { clave: 'area-directorio', icono: <Icono n="directorio" />, titulo: 'Directorio', onClick: () => setTabElegida(pestañas[0].id), activo: true },
+    { clave: 'area-deposito', icono: <Icono n={depositoVisible.icono} />, titulo: depositoVisible.nombre, onClick: () => navigate('/deposito') },
+  ] }] : [];
+  const pie = tieneAccesoAdmin(profile) ? [{ clave: 'config', icono: <Icono n="config" />, titulo: 'Configuración', cantidad: sugerenciasNuevas, onClick: () => navigate('/admin') }] : [];
 
   const navItems = [
     ...pestañas.map(p => ({ icon: p.icon, label: p.label, onClick: () => setTabElegida(p.id), active: tab === p.id })),
-    ...(puedeIrAlDeposito ? [{ icon: <Icono n="herramienta" />, label: 'Depósito', onClick: () => navigate('/mantenimiento') }] : []),
+    ...(puedeIrAlDeposito ? [{ icon: <Icono n={depositoVisible.icono} />, label: depositoVisible.nombre, onClick: () => navigate('/deposito') }] : []),
   ];
 
   return (
-    <div className="app-screen">
+    <div className={`app-screen con-menu-lateral${menuFijo ? ' menu-fijo' : ''}`}>
       <header className="app-header">
         <div className="header-logo">
           {config?.logo_base64 && <img src={config.logo_base64} alt={nombreEmpresa} />}
           <div>
             <div className="header-logo-fallback">{nombreEmpresa}</div>
-            <div className="header-title">Directorio</div>
+            <h1 className="header-title">Directorio</h1>
           </div>
         </div>
         <div className="header-right">
-          {puedeIrAlDeposito && (
-            <Link to="/mantenimiento" className="btn-mantenimiento" title="Depósito de mantenimiento" style={{ display: 'flex' }}><Icono n="herramienta" /> <span className="hide-mobile">Depósito</span></Link>
-          )}
           <UserMenu />
-          <button className="hamburger-btn" onClick={() => setMenuOpen(true)} aria-label="Menú">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
+          <BotonHamburguesa onClick={() => setMenuOpen(true)} aviso={avisosTotal > 0} />
         </div>
       </header>
 
-      <nav className="app-nav">
-        {pestañas.map(p => (
-          <button key={p.id} className={`nav-tab${tab === p.id ? ' active' : ''}`} onClick={() => setTabElegida(p.id)}>{p.icon} {p.label}</button>
-        ))}
-      </nav>
+      <MenuLateral secciones={[...areas, ...secciones]} pie={pie} fijo={menuFijo} onAlternarFijo={alternarMenuFijo} />
 
       <main className="app-main">
         {tab === 'proveedores' && <ProveedoresList />}

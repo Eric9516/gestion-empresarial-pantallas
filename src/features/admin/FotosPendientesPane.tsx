@@ -41,7 +41,7 @@ export default function FotosPendientesPane() {
     return (
       <div className="empty-state">
         <div className="empty-icon"><Icono n="camara" /></div>
-        <h3>No hay fotos pendientes</h3>
+        <h2>No hay fotos pendientes</h2>
         <p>Cuando un usuario común del depósito cargue una foto, va a aparecer acá para que la revises.</p>
       </div>
     );

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { registrarErrorAccion } from '../../lib/errorLogging';
@@ -36,7 +37,7 @@ export default function EditarReparacionModal({ reparacion, onClose }: Props) {
   const enviosLibresDelProv = useMemo(() => enviosLibres(enviosDelProv, asignados, reparacion?.id), [enviosDelProv, asignados, reparacion?.id]);
   const { data: detallesDeEnvios } = useDetallesDeEnviosQuery(enviosLibresDelProv.map(e => e.id));
 
-  useEffect(() => {
+  useAlCambiar([reparacion], () => {
     if (reparacion) {
       setProveedorId(reparacion.proveedor_id);
       setMotivo(reparacion.motivo);
@@ -45,7 +46,7 @@ export default function EditarReparacionModal({ reparacion, onClose }: Props) {
       setOcNumero(reparacion.orden_compra_numero ?? '');
       setOcFecha(reparacion.orden_compra_fecha ?? '');
     }
-  }, [reparacion]);
+  });
 
   async function handleGuardar() {
     if (!reparacion) return;

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useConfiguracionQuery } from '../features/config/useConfiguracion';
 import { aplicarMarca } from '../lib/marca';
+import { useDepositoActual } from '../features/depositos/useDepositos';
 
 // No dibuja nada: aplica los colores y el logo de marca de la empresa a toda la app (también
 // al login, porque la configuración se puede leer antes de iniciar sesión). El logo hace de
@@ -8,7 +9,8 @@ import { aplicarMarca } from '../lib/marca';
 export default function AplicarMarca() {
   const { data: config } = useConfiguracionQuery();
   const primario = config?.color_primario;
-  const deposito = config?.color_deposito;
+  // El color del encabezado del Depósito es el de su depósito; sin depósito (o si la base todavía no los tiene), el que la empresa tenía elegido.
+  const deposito = useDepositoActual()?.color ?? config?.color_deposito;
   const logo = config?.logo_base64;
 
   useEffect(() => {

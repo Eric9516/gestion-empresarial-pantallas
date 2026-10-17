@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useConfiguracionQuery } from '../features/config/useConfiguracion';
 import { Button } from '@/components/ui/button';
@@ -9,23 +9,20 @@ import { Icono, type NombreIcono } from '@/components/Icono';
 // así la pantalla de login queda igual de genérica en cualquier instalación.
 const ICONOS: NombreIcono[] = ['fabrica', 'acuerdo', 'paquete', 'herramienta'];
 
+// 8 íconos flotando con posición y velocidad al azar. Se sortean una sola vez al cargar la página (no al dibujar: dibujar tiene que dar siempre lo mismo).
+const GOTAS = Array.from({ length: 8 }, (_, i) => ({
+  emoji: ICONOS[i % ICONOS.length],
+  left: `${Math.random() * 100}%`,
+  animationDuration: `${8 + Math.random() * 12}s`,
+  animationDelay: `${-Math.random() * 15}s`,
+  fontSize: `${24 + Math.random() * 30}px`,
+}));
+
 function AuthDecorations() {
-  // Espeja initAuthDeco() de main.js: 8 íconos flotando con posición/velocidad
-  // aleatoria, generados una sola vez por montaje (useMemo, no en cada render).
-  const drops = useMemo(
-    () =>
-      Array.from({ length: 8 }, (_, i) => ({
-        emoji: ICONOS[i % ICONOS.length],
-        left: `${Math.random() * 100}%`,
-        animationDuration: `${8 + Math.random() * 12}s`,
-        animationDelay: `${-Math.random() * 15}s`,
-        fontSize: `${24 + Math.random() * 30}px`,
-      })),
-    []
-  );
+  const drops = GOTAS;
 
   return (
-    <div className="auth-decorations">
+    <div className="auth-decorations" aria-hidden="true">
       {drops.map((d, i) => (
         <div key={i} className="icon-float" style={{ left: d.left, animationDuration: d.animationDuration, animationDelay: d.animationDelay, fontSize: d.fontSize }}>
           <Icono n={d.emoji} tam="1em" trazo={1.5} />
@@ -62,7 +59,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-screen">
+    <main className="auth-screen">
       <AuthDecorations />
       <div className="auth-card">
         <div className="auth-logo">
@@ -70,7 +67,7 @@ export default function LoginPage() {
             ? <img src={config.logo_base64} alt={nombreEmpresa} />
             : <div className="auth-logo-fallback">{nombreEmpresa[0]}</div>}
         </div>
-        <div className="auth-title">{nombreEmpresa}</div>
+        <h1 className="auth-title">{nombreEmpresa}</h1>
         <div className="auth-subtitle"><Icono n="clave" /> Ingresá con tu cuenta</div>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -89,9 +86,8 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--text-muted)' }}>
           
           <Icono n="candado" /> Acceso restringido — Solo usuarios autorizados
-          <div style={{ marginTop: 20, fontSize: 11, color: 'var(--text-muted)' }}>Desarrollado por Eric Cantoni · 2025</div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

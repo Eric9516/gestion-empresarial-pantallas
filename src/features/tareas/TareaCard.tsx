@@ -19,7 +19,9 @@ interface Props {
 export default function TareaCard({ tarea: t, grid, onOpen, onCompletar }: Props) {
   const isCompleted = t.status === 'completed';
 
-  const titulo = <div className="task-card-title">{isCompleted ? <s style={{ opacity: 0.5 }}>{t.title}</s> : t.title}</div>;
+  // Con el teclado se llega por el título (es lo que se abre); con el mouse sirve toda la tarjeta. El botón de completar queda aparte, no adentro de otro botón.
+  const { onClick: _alHacerClic, ...conTeclado } = clicConTeclado(() => onOpen(t.id));
+  const titulo = <div className="task-card-title" {...conTeclado}>{isCompleted ? <s style={{ opacity: 0.5 }}>{t.title}</s> : t.title}</div>;
   const badge = <span className={`traffic-badge ${t.traffic_level}`}>{TRAFFIC_LABEL[t.traffic_level] || t.traffic_level}</span>;
   const stagnant = t.is_stagnant ? <span className="stagnant-badge"><Icono n="alerta" /></span> : null;
   const desc = t.description ? <div className="task-card-desc">{t.description}</div> : null;
@@ -31,12 +33,12 @@ export default function TareaCard({ tarea: t, grid, onOpen, onCompletar }: Props
     </div>
   );
   const completeBtn = !isCompleted ? (
-    <button className="task-action-btn complete" onClick={e => { e.stopPropagation(); onCompletar(t.id); }}><Icono n="ok" /></button>
+    <button className="task-action-btn complete" aria-label="Marcar como completada" title="Marcar como completada" onClick={e => { e.stopPropagation(); onCompletar(t.id); }}><Icono n="ok" /></button>
   ) : null;
 
   if (grid) {
     return (
-      <div className={`task-card ${t.traffic_level}`} {...clicConTeclado(() => onOpen(t.id))}>
+      <div className={`task-card ${t.traffic_level}`} onClick={() => onOpen(t.id)}>
         <div className="task-card-top">{titulo}{badge} {stagnant}</div>
         {desc}
         {meta}
@@ -46,7 +48,7 @@ export default function TareaCard({ tarea: t, grid, onOpen, onCompletar }: Props
   }
 
   return (
-    <div className={`task-card ${t.traffic_level}`} {...clicConTeclado(() => onOpen(t.id))}>
+    <div className={`task-card ${t.traffic_level}`} onClick={() => onOpen(t.id)}>
       <div className="task-card-body">
         <div className="task-card-top">{titulo}{badge} {stagnant}</div>
         {desc}

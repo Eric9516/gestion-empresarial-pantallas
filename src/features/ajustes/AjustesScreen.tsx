@@ -5,11 +5,13 @@ import { useToast } from '../../components/ToastProvider';
 import { useAuth } from '../../auth/AuthContext';
 import { isOwner } from '../../lib/types';
 import { fechaLocalDe } from '../../lib/fechaHoy';
-import { formatoCantidad } from '../../lib/ajustes';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
+import BotonVerMas from '../../components/BotonVerMas';
+import { comprobanteTexto, formatoCantidad, NOMBRE_DE_LA_CLASE } from '../../lib/ajustes';
 import { exportarExcel, type FilaExcel } from '../../lib/exportExcel';
 import { registrarErrorAccion } from '../../lib/errorLogging';
 import { useAjustesQuery, useAnularAjuste, type Ajuste } from './useAjustes';
-import NuevoAjusteModal from './NuevoAjusteModal';
+import NuevoMovimientoModal from './NuevoMovimientoModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -17,7 +19,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
-type Filtro = 'todos' | 'restas' | 'sumas' | 'anulados';
+type Filtro = 'todos' | 'cargas' | 'ajustes' | 'restas' | 'sumas' | 'anulados';
+
+const comprobanteDe = (a: Ajuste) => comprobanteTexto(a.clase, a.punto_venta, a.numero);
+const soloDia = (f: string) => f.split('-').reverse().join('/');
 
 const cuando = (ts: string) => new Date(ts).toLocaleString('es-AR');
 
@@ -25,14 +30,6 @@ function totales(a: Ajuste) {
   let sumado = 0, restado = 0;
   for (const l of a.ajuste_items) { if (l.tipo === 'suma') sumado += Number(l.cantidad); else restado += Number(l.cantidad); }
   return { sumado, restado };
-}
-
-function coincide(a: Ajuste, texto: string): boolean {
-  const palabras = texto.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (!palabras.length) return true;
-  const campos = [a.motivo, a.usuarioNombre, a.motivo_anulacion, a.anuladoPorNombre, ...a.ajuste_items.flatMap(l => [l.items?.codigo, l.items?.descripcion])]
-    .filter((v): v is string => !!v).map(v => v.toLowerCase());
-  return palabras.every(p => campos.some(c => c.includes(p)));
 }
 
 function Estado({ a }: { a: Ajuste }) {
@@ -68,32 +65,36 @@ function resumenArticulos(a: Ajuste) {
 
 function DetalleAjuste({ ajuste, onClose, onAnular, puedeAnular }: { ajuste: Ajuste | null; onClose: () => void; onAnular: (a: Ajuste) => void; puedeAnular: boolean }) {
   return (
-    <Modal open={!!ajuste} onClose={onClose} large title={<><Icono n="balanza" /> Detalle del ajuste</>} footer={
+    <Modal open={!!ajuste} onClose={onClose} large title={<><Icono n="balanza" /> {ajuste ? comprobanteDe(ajuste) : 'Detalle'}</>} footer={
       <>
-        {ajuste && !ajuste.anulado && puedeAnular && <Button variant="dangerGhost" onClick={() => onAnular(ajuste)}>Anular este ajuste</Button>}
+        {ajuste && !ajuste.anulado && puedeAnular && <Button variant="dangerGhost" onClick={() => onAnular(ajuste)}>Anular este comprobante</Button>}
         <Button variant="ghost" onClick={onClose}>Cerrar</Button>
       </>
     }>
       {ajuste && (
         <div>
           <div style={{ fontSize: 13, display: 'grid', gap: 4, marginBottom: 12 }}>
-            <div><strong>Fecha:</strong> {cuando(ajuste.created_at)}</div>
+            <div><strong>Tipo:</strong> {NOMBRE_DE_LA_CLASE[ajuste.clase]} <span style={{ color: 'var(--text-muted)' }}>({comprobanteDe(ajuste)})</span></div>
+            <div><strong>Fecha:</strong> {soloDia(ajuste.fecha)} <span style={{ color: 'var(--text-muted)' }}>(registrado el {cuando(ajuste.created_at)})</span></div>
             <div><strong>Lo hizo:</strong> {ajuste.usuarioNombre}</div>
             <div><strong>Motivo:</strong> {ajuste.motivo}</div>
+            {ajuste.referencia && <div><strong>Referencia:</strong> {ajuste.referencia}</div>}
+            {ajuste.observaciones && <div><strong>Observaciones:</strong> {ajuste.observaciones}</div>}
             <div><strong>Estado:</strong> <Estado a={ajuste} /></div>
             {ajuste.anulado && (
               <div style={{ padding: '8px 10px', background: 'var(--danger-bg)', borderRadius: 'var(--radius-sm)', color: 'var(--danger)' }}>
-                Anulado por <strong>{ajuste.anuladoPorNombre}</strong> el {ajuste.anulado_at ? cuando(ajuste.anulado_at) : ''}. Motivo: {ajuste.motivo_anulacion}. El stock volvió a como estaba antes de este ajuste.
+                Anulado por <strong>{ajuste.anuladoPorNombre}</strong> el {ajuste.anulado_at ? cuando(ajuste.anulado_at) : ''}. Motivo: {ajuste.motivo_anulacion}. El stock volvió a como estaba antes de este comprobante.
               </div>
             )}
           </div>
           <div className="table-wrap" style={{ display: 'block' }}>
             <table>
-              <thead><tr><th>Artículo</th><th>Movimiento</th><th>Stock</th></tr></thead>
+              <thead><tr><th>Artículo</th><th>UM</th><th>Movimiento</th><th>Stock</th></tr></thead>
               <tbody>
                 {ajuste.ajuste_items.map(l => (
                   <tr key={l.id}>
                     <td><strong>{l.items?.codigo}</strong> — {l.items?.descripcion}</td>
+                    <td>{l.items?.unidad ?? 'Uni'}</td>
                     <td style={{ fontWeight: 700, color: l.tipo === 'suma' ? 'var(--success)' : 'var(--danger)', whiteSpace: 'nowrap' }}>{l.tipo === 'suma' ? <><Icono n="mas" /> Suma</> : <><Icono n="menos" /> Resta</>} {formatoCantidad(l.cantidad)}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{formatoCantidad(l.stock_antes)} → {formatoCantidad(l.stock_despues)}</td>
                   </tr>
@@ -119,7 +120,7 @@ function AnularModal({ ajuste, onClose }: { ajuste: Ajuste | null; onClose: () =
     if (!motivo.trim()) { toast('Indicá el motivo de la anulación', 'error'); return; }
     try {
       await anular.mutateAsync({ id: ajuste.id, motivo: motivo.trim() });
-      toast('Ajuste anulado: el stock volvió a como estaba', 'success');
+      toast('Comprobante anulado: el stock volvió a como estaba', 'success');
       cerrar();
     } catch (err) {
       await registrarErrorAccion('Error al anular un ajuste de inventario', err);
@@ -128,7 +129,7 @@ function AnularModal({ ajuste, onClose }: { ajuste: Ajuste | null; onClose: () =
   }
 
   return (
-    <Modal open={!!ajuste} onClose={cerrar} title="Anular ajuste" footer={
+    <Modal open={!!ajuste} onClose={cerrar} title={ajuste ? `Anular ${comprobanteDe(ajuste)}` : 'Anular'} footer={
       <>
         <Button variant="ghost" onClick={cerrar}>Cancelar</Button>
         <Button variant="red" disabled={anular.isPending} onClick={() => void confirmar()}>{anular.isPending ? 'Anulando...' : 'Sí, anular'}</Button>
@@ -137,8 +138,8 @@ function AnularModal({ ajuste, onClose }: { ajuste: Ajuste | null; onClose: () =
       {ajuste && (
         <>
           <p style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 12 }}>
-            El ajuste del {cuando(ajuste.created_at)} ({ajuste.motivo}) se anula: el stock de sus {ajuste.ajuste_items.length} artículo{ajuste.ajuste_items.length === 1 ? '' : 's'} vuelve a como estaba antes.
-            El ajuste <strong>no se borra</strong>: queda en la lista marcado como anulado, con tu nombre y este motivo.
+            El comprobante {comprobanteDe(ajuste)} del {cuando(ajuste.created_at)} ({ajuste.motivo}) se anula: el stock de sus {ajuste.ajuste_items.length} artículo{ajuste.ajuste_items.length === 1 ? '' : 's'} vuelve a como estaba antes.
+            El comprobante <strong>no se borra</strong>: queda en la lista marcado como anulado, con tu nombre y este motivo.
           </p>
           <div className="form-group full">
             <label htmlFor="anular-motivo">Motivo de la anulación (obligatorio)</label>
@@ -152,7 +153,6 @@ function AnularModal({ ajuste, onClose }: { ajuste: Ajuste | null; onClose: () =
 
 export default function AjustesScreen() {
   const { profile } = useAuth();
-  const { data: ajustes, isLoading, isError } = useAjustesQuery();
   const toast = useToast();
   const puedeAnular = isOwner(profile);
 
@@ -164,18 +164,12 @@ export default function AjustesScreen() {
   const [detalleId, setDetalleId] = useState<string | null>(null);
   const [anulando, setAnulando] = useState<Ajuste | null>(null);
 
+  // La búsqueda, el tipo y las fechas los filtra la base (de a páginas): acá llegan ya filtrados.
+  const busquedaConPausa = useDebouncedValue(busqueda, 300);
+  const { ajustes, isLoading, isError, hayMas, cargandoMas, verMas, buscando } = useAjustesQuery({ texto: busquedaConPausa, filtro, desde, hasta });
   const detalle = useMemo(() => (ajustes ?? []).find(a => a.id === detalleId) ?? null, [ajustes, detalleId]);
 
-  const filas = useMemo(() => (ajustes ?? []).filter(a => {
-    if (!coincide(a, busqueda)) return false;
-    const dia = fechaLocalDe(a.created_at);
-    if (desde && dia < desde) return false;
-    if (hasta && dia > hasta) return false;
-    if (filtro === 'anulados') return a.anulado;
-    if (filtro === 'restas') return a.ajuste_items.some(l => l.tipo === 'resta');
-    if (filtro === 'sumas') return a.ajuste_items.some(l => l.tipo === 'suma');
-    return true;
-  }), [ajustes, busqueda, filtro, desde, hasta]);
+  const filas = ajustes;
 
   // Lo que importa del control: cuánto salió sin anotarse (restas vigentes) en lo que se está viendo.
   const resumen = useMemo(() => {
@@ -185,13 +179,19 @@ export default function AjustesScreen() {
   }, [filas]);
 
   async function exportar() {
-    if (!filas.length) { toast('No hay ajustes para exportar con esos filtros', 'error'); return; }
+    if (!filas.length) { toast('No hay movimientos para exportar con esos filtros', 'error'); return; }
     const rows: FilaExcel[] = filas.flatMap(a => a.ajuste_items.map(l => ({
-      Fecha: cuando(a.created_at),
+      Comprobante: comprobanteDe(a),
+      Tipo: NOMBRE_DE_LA_CLASE[a.clase],
+      Fecha: soloDia(a.fecha),
+      Registrado: cuando(a.created_at),
       'Lo hizo': a.usuarioNombre,
       Motivo: a.motivo,
+      Referencia: a.referencia ?? '',
+      Observaciones: a.observaciones ?? '',
       Código: l.items?.codigo ?? '',
       Descripción: l.items?.descripcion ?? '',
+      UM: l.items?.unidad ?? '',
       Movimiento: l.tipo === 'suma' ? 'Suma' : 'Resta',
       Cantidad: Number(l.cantidad),
       'Stock antes': l.stock_antes === null ? '' : Number(l.stock_antes),
@@ -201,12 +201,13 @@ export default function AjustesScreen() {
       'Fecha de anulación': a.anulado_at ? cuando(a.anulado_at) : '',
       'Motivo de la anulación': a.motivo_anulacion ?? '',
     })));
-    await exportarExcel(rows, 'Ajustes', `ajustes_inventario_${fechaLocalDe(new Date().toISOString())}.xlsx`);
+    await exportarExcel(rows, 'Movimientos', `movimientos_de_stock_${fechaLocalDe(new Date().toISOString())}.xlsx`);
     toast('Excel exportado', 'success');
   }
 
   const columns: Column<Ajuste>[] = [
-    { header: 'Fecha', render: a => cuando(a.created_at) },
+    { header: 'Comprobante', render: a => <strong style={{ whiteSpace: 'nowrap' }}>{comprobanteDe(a)}</strong> },
+    { header: 'Fecha', render: a => soloDia(a.fecha) },
     { header: 'Lo hizo', render: a => a.usuarioNombre },
     { header: 'Motivo', render: a => a.motivo },
     { header: 'Artículos', render: a => resumenArticulos(a) },
@@ -227,10 +228,10 @@ export default function AjustesScreen() {
       <div className="prov-card">
         <div className="prov-card-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-            <span className="prov-card-name">{a.motivo}</span>
+            <span className="prov-card-name">{comprobanteDe(a)} · {a.motivo}</span>
             <Estado a={a} />
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cuando(a.created_at)} · {a.usuarioNombre}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{soloDia(a.fecha)} · {a.usuarioNombre}</div>
         </div>
         <div className="prov-card-body">
           <div className="prov-card-row">{resumenArticulos(a)}</div>
@@ -247,19 +248,21 @@ export default function AjustesScreen() {
   return (
     <div>
       <div className="section-header">
-        <div className="section-title"><Icono n="balanza" /> Ajuste de inventario</div>
+        <div className="section-title"><Icono n="balanza" /> Movimientos de stock</div>
       </div>
 
       <p style={{ fontSize: 13, color: 'var(--text-mid)', marginBottom: 12 }}>
-        Sumá o restá stock de varios repuestos a la vez. Las <strong>restas</strong> son material que salió sin anotarse en la aplicación. Todo queda registrado y no se puede borrar{puedeAnular ? '; vos podés anular un ajuste si hubo un error' : '; solo un dueño puede anular un ajuste si hubo un error'}.
+        Acá se carga y se corrige el stock: una <strong>carga</strong> hace entrar mercadería, un <strong>ajuste</strong> suma o resta lo que no se anotó. Cada uno es un comprobante con su número. Todo queda registrado y no se puede borrar{puedeAnular ? '; vos podés anular un comprobante si hubo un error' : '; solo un dueño puede anular un comprobante si hubo un error'}.
       </p>
 
       <div className="toolbar">
         <div className="search-wrap">
-          <Input type="text" placeholder="Artículo, motivo o quién lo hizo..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+          <Input type="text" placeholder="Número, artículo, motivo o quién lo hizo..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
         </div>
-        <Select className="filter-select" value={filtro} onChange={e => setFiltro(e.target.value as Filtro)}>
+        <Select className="filter-select" aria-label="Filtrar movimientos" value={filtro} onChange={e => setFiltro(e.target.value as Filtro)}>
           <option value="todos">Todos</option>
+          <option value="cargas">Cargas de stock</option>
+          <option value="ajustes">Ajustes</option>
           <option value="restas">Con restas (salió sin anotar)</option>
           <option value="sumas">Con sumas</option>
           <option value="anulados">Anulados</option>
@@ -267,12 +270,12 @@ export default function AjustesScreen() {
         <Input type="date" aria-label="Desde" title="Desde" value={desde} onChange={e => setDesde(e.target.value)} style={{ width: 150 }} />
         <Input type="date" aria-label="Hasta" title="Hasta" value={hasta} onChange={e => setHasta(e.target.value)} style={{ width: 150 }} />
         <Button variant="ghost" size="sm" onClick={() => void exportar()}>Excel</Button>
-        <Button variant="primary" size="sm" onClick={() => setNuevoOpen(true)}>+ Nuevo ajuste</Button>
+        <Button variant="primary" size="sm" onClick={() => setNuevoOpen(true)}>+ Nuevo movimiento</Button>
       </div>
 
       {!isLoading && !isError && filas.length > 0 && (
         <p style={{ fontSize: 13, color: 'var(--text-mid)', margin: '8px 0 12px' }}>
-          En lo que ves ({resumen.vigentes} ajuste{resumen.vigentes === 1 ? '' : 's'} vigente{resumen.vigentes === 1 ? '' : 's'}):
+          En lo que ves ({resumen.vigentes} comprobante{resumen.vigentes === 1 ? '' : 's'} vigente{resumen.vigentes === 1 ? '' : 's'}):
           {' '}<strong style={{ color: 'var(--danger)' }}><Icono n="menos" /> {formatoCantidad(resumen.restado)} unidades restadas</strong>
           {' · '}<strong style={{ color: 'var(--success)' }}><Icono n="mas" /> {formatoCantidad(resumen.sumado)} sumadas</strong>. Los anulados no se cuentan.
         </p>
@@ -280,6 +283,7 @@ export default function AjustesScreen() {
 
       {isLoading && <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>}
       {isError && <p style={{ color: 'var(--danger)' }}>Error al cargar los ajustes.</p>}
+      {!isLoading && !isError && buscando && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}><Icono n="buscar" /> Buscando...</p>}
       {!isLoading && !isError && (
         <ResponsiveList
           columns={columns}
@@ -287,12 +291,13 @@ export default function AjustesScreen() {
           renderCard={renderCard}
           keyField={a => a.id}
           emptyIcon={<Icono n="balanza" />}
-          emptyTitle="No hay ajustes"
-          emptyDescription={ajustes?.length ? 'Probá con otros filtros o con otra búsqueda.' : 'Todavía no se hizo ningún ajuste de inventario.'}
+          emptyTitle="No hay movimientos"
+          emptyDescription={busqueda.trim() || desde || hasta || filtro !== 'todos' ? 'Probá con otros filtros o con otra búsqueda.' : 'Todavía no se cargó ni se ajustó stock.'}
         />
       )}
+      {!isLoading && !isError && <BotonVerMas hayMas={hayMas} cargando={cargandoMas} mostrando={filas.length} onClick={verMas} />}
 
-      <NuevoAjusteModal open={nuevoOpen} onClose={() => setNuevoOpen(false)} />
+      <NuevoMovimientoModal open={nuevoOpen} onClose={() => setNuevoOpen(false)} />
       <DetalleAjuste ajuste={detalle} onClose={() => setDetalleId(null)} onAnular={a => { setDetalleId(null); setAnulando(a); }} puedeAnular={puedeAnular} />
       <AnularModal ajuste={anulando} onClose={() => setAnulando(null)} />
     </div>

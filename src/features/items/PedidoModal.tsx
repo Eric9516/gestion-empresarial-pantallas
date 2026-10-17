@@ -5,20 +5,22 @@ import { registrarErrorAccion } from '../../lib/errorLogging';
 import { fechaHoyISO } from '../../lib/fechaHoy';
 import { abrirPdfBlob, descargarPdfBlob } from '../../lib/pdfBlob';
 import { generarPedidoBlob, type LineaPedido } from '../../lib/pedidoPdf';
-import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { useConfiguracionQuery } from '../config/useConfiguracion';
 import { NOMBRE_EMPRESA_POR_DEFECTO } from '../../lib/empresa';
 import { useProveedoresQuery } from '../proveedores/useProveedores';
 import { cantidadAComprar } from './reposicion';
-import { prepararBusqueda, puntajeConBusquedaPreparada, useItemsQuery, type Item } from './useItems';
+import { useRepuestosParaElegir, type Item } from './useItems';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
+// De cada repuesto el pedido necesita solo esto (sirve tanto con el repuesto completo como con un resultado de búsqueda).
+export type RepuestoParaPedido = Pick<Item, 'id' | 'codigo' | 'descripcion' | 'stock' | 'stock_minimo' | 'punto_pedido'>;
+
 interface Props {
-  items: Item[];
+  items: RepuestoParaPedido[];
   onClose: () => void;
   // Se llama al descargar, con los repuestos que quedaron en el pedido.
   onDescargado?: (ids: string[]) => void;
@@ -34,23 +36,12 @@ const MAX_SUGERENCIAS = 6;
 // Suma a la lista un repuesto cualquiera del sistema (buscando entre todos, no
 // solo los del informe) o una línea en blanco para escribir a mano.
 function AgregarLinea({ yaAgregados, onAgregarItem, onAgregarManual }: {
-  yaAgregados: Set<string>; onAgregarItem: (it: Item) => void; onAgregarManual: () => void;
+  yaAgregados: Set<string>; onAgregarItem: (it: RepuestoParaPedido) => void; onAgregarManual: () => void;
 }) {
-  const { data: items } = useItemsQuery();
   const [busqueda, setBusqueda] = useState('');
-  const busquedaDebounced = useDebouncedValue(busqueda);
+  const encontrados = useRepuestosParaElegir(busqueda.trim().length < 2 ? '' : busqueda, MAX_SUGERENCIAS + 12);
 
-  const sugerencias = useMemo(() => {
-    if (busquedaDebounced.trim().length < 2) return [];
-    const terminos = prepararBusqueda(busquedaDebounced);
-    return (items ?? [])
-      .filter(it => !yaAgregados.has(it.id))
-      .map(it => ({ it, puntaje: puntajeConBusquedaPreparada(it, terminos) }))
-      .filter(r => r.puntaje > 0)
-      .sort((a, b) => b.puntaje - a.puntaje || a.it.codigo.localeCompare(b.it.codigo))
-      .slice(0, MAX_SUGERENCIAS)
-      .map(r => r.it);
-  }, [items, busquedaDebounced, yaAgregados]);
+  const sugerencias = useMemo(() => encontrados.filter(it => !yaAgregados.has(it.id)).slice(0, MAX_SUGERENCIAS), [encontrados, yaAgregados]);
 
   return (
     <div style={{ margin: '4px 0 12px' }}>
@@ -93,7 +84,7 @@ export default function PedidoModal({ items, onClose, onDescargado }: Props) {
   }
 
   // Las líneas nuevas van arriba de todo, donde se ve el buscador, y no perdidas al final de una lista larga.
-  function agregarItem(it: Item) {
+  function agregarItem(it: RepuestoParaPedido) {
     setLineas(prev => [{ id: it.id, codigo: it.codigo, descripcion: it.descripcion, cantidad: '1' }, ...prev]);
   }
 

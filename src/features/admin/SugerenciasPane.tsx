@@ -1,4 +1,5 @@
 import ResponsiveList, { type Column } from '../../components/ResponsiveList';
+import BotonVerMas from '../../components/BotonVerMas';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
 import { useLimpiarSugerencias, useSugerenciasQuery, type Sugerencia } from './useSugerencias';
@@ -27,7 +28,7 @@ function renderCard(s: Sugerencia) {
 }
 
 export default function SugerenciasPane() {
-  const { data: rows, isLoading, isError } = useSugerenciasQuery();
+  const { filas: rows, isLoading, isError, hayMas, cargandoMas, verMas } = useSugerenciasQuery();
   const limpiar = useLimpiarSugerencias();
   const toast = useToast();
   const confirmar = useConfirm();
@@ -54,7 +55,7 @@ export default function SugerenciasPane() {
         {!isLoading && !isError && (
           <ResponsiveList
             columns={columns}
-            data={rows ?? []}
+            data={rows}
             renderCard={renderCard}
             keyField={s => s.id}
             emptyIcon={<Icono n="mensaje" />}
@@ -62,6 +63,7 @@ export default function SugerenciasPane() {
             emptyDescription=""
           />
         )}
+        {!isLoading && !isError && <BotonVerMas hayMas={hayMas} cargando={cargandoMas} mostrando={rows.length} onClick={verMas} />}
       </div>
     </div>
   );

@@ -1,4 +1,8 @@
+import { useState } from 'react';
 import ResponsiveList, { type Column } from '../../components/ResponsiveList';
+import BotonVerMas from '../../components/BotonVerMas';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useAuditLogQuery, type AuditLogRow } from './useAuditLog';
 import { Icono } from '@/components/Icono';
 
@@ -40,18 +44,34 @@ function renderCard(r: AuditLogRow) {
 }
 
 export default function HistorialPane() {
-  const { data: rows, isLoading, isError } = useAuditLogQuery();
+  const [tabla, setTabla] = useState('');
+  const [accion, setAccion] = useState('');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+  const { filas: rows, isLoading, isError, hayMas, cargandoMas, verMas } = useAuditLogQuery({ tabla, accion, desde, hasta });
 
   return (
     <div className="admin-card">
       <div className="admin-card-header"><Icono n="historial" /> Historial de cambios</div>
+      <div className="toolbar" style={{ padding: '12px 16px 0' }}>
+        <Select className="filter-select" aria-label="Filtrar por tipo" value={tabla} onChange={e => setTabla(e.target.value)}>
+          <option value="">Todo</option>
+          {Object.entries(TABLA_LABELS).map(([valor, nombre]) => <option key={valor} value={valor}>{nombre}</option>)}
+        </Select>
+        <Select className="filter-select" aria-label="Filtrar por acción" value={accion} onChange={e => setAccion(e.target.value)}>
+          <option value="">Altas, ediciones y bajas</option>
+          {Object.entries(ACCION_LABELS).map(([valor, nombre]) => <option key={valor} value={valor}>{nombre}</option>)}
+        </Select>
+        <Input type="date" aria-label="Desde" title="Desde" value={desde} onChange={e => setDesde(e.target.value)} style={{ width: 150 }} />
+        <Input type="date" aria-label="Hasta" title="Hasta" value={hasta} onChange={e => setHasta(e.target.value)} style={{ width: 150 }} />
+      </div>
       <div className="admin-card-body" style={{ padding: rows?.length ? 0 : 18 }}>
         {isLoading && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cargando...</p>}
         {isError && <p style={{ color: 'var(--danger)', fontSize: 13 }}>Error al cargar historial</p>}
         {!isLoading && !isError && (
           <ResponsiveList
             columns={columns}
-            data={rows ?? []}
+            data={rows}
             renderCard={renderCard}
             keyField={keyField}
             emptyIcon={<Icono n="historial" />}
@@ -59,6 +79,7 @@ export default function HistorialPane() {
             emptyDescription=""
           />
         )}
+        {!isLoading && !isError && <BotonVerMas hayMas={hayMas} cargando={cargandoMas} mostrando={rows.length} onClick={verMas} />}
       </div>
     </div>
   );

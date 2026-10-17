@@ -35,7 +35,7 @@ input[type="file"] { display: none; }
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
   border: 1.5px solid var(--border);
-  min-width: 180px;
+  min-width: 240px;
   z-index: 200;
   padding: 6px;
   animation: dropdownIn 0.15s ease;
@@ -46,6 +46,12 @@ input[type="file"] { display: none; }
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Quién tiene la sesión abierta: nombre, correo y rol. */
+.user-dropdown-cuenta { padding: 8px 12px 10px; }
+.user-dropdown-nombre { font-size: 14px; font-weight: 800; color: var(--text); }
+.user-dropdown-correo { font-size: 12px; color: var(--text-muted); margin: 1px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.user-dropdown-rol { font-size: 11px; }
 
 .user-dropdown-item {
   display: flex;

@@ -1,0 +1,26 @@
+/* Color de los íconos. Los íconos son de un solo trazo y heredan el color del texto; en las zonas de fondo claro (pestañas, títulos, tarjetas, acciones de las tablas)
+   cada uno lleva su color según lo que significa: azul para ver y buscar, ámbar para editar y lo que se guarda en el depósito, rojo para borrar, verde para lo que sale bien,
+   violeta para fechas y etiquetas, verde azulado para planillas y fotos. En botones de color y en el encabezado oscuro siguen en blanco. */
+:root {
+  --ic-azul: #2f6fd1;
+  --ic-ambar: #c77a0b;
+  --ic-rojo: #d6403f;
+  --ic-verde: #1f9d63;
+  --ic-violeta: #7d5fd0;
+  --ic-teal: #139a9a;
+}
+
+:is(.nav-tab, .menu-lateral-item, .section-title, .stat-icon, .empty-icon, .td-actions, .prov-card, .contact-chip, .task-meta-item, .auth-subtitle, .mobile-nav-icon, .detail-item, .toolbar, .tareas-filter-btn:not(.active), .vista-btn, .vista-option:not(.active)) svg:is([data-icono="ver"], [data-icono="buscar"], [data-icono="usuario"], [data-icono="usuarios"], [data-icono="fabrica"], [data-icono="informe"], [data-icono="historial"], [data-icono="empresa"], [data-icono="documento"], [data-icono="lista"], [data-icono="inicio"], [data-icono="vistaLista"], [data-icono="vistaGrilla"], [data-icono="carpeta"], [data-icono="carpetaAbierta"], [data-icono="mensaje"], [data-icono="correo"], [data-icono="objetivo"], [data-icono="importar"], [data-icono="nota"]) { color: var(--ic-azul); }
+
+:is(.nav-tab, .menu-lateral-item, .section-title, .stat-icon, .empty-icon, .td-actions, .prov-card, .contact-chip, .task-meta-item, .auth-subtitle, .mobile-nav-icon, .detail-item, .toolbar, .tareas-filter-btn:not(.active), .vista-btn, .vista-option:not(.active)) svg:is([data-icono="editar"], [data-icono="paquete"], [data-icono="herramienta"], [data-icono="carrito"], [data-icono="retirar"], [data-icono="idea"], [data-icono="estrella"], [data-icono="alerta"], [data-icono="espera"], [data-icono="semaforo"], [data-icono="corona"], [data-icono="nuevo"], [data-icono="regla"]) { color: var(--ic-ambar); }
+
+:is(.nav-tab, .menu-lateral-item, .section-title, .stat-icon, .empty-icon, .td-actions, .prov-card, .contact-chip, .task-meta-item, .auth-subtitle, .mobile-nav-icon, .detail-item, .toolbar, .tareas-filter-btn:not(.active), .vista-btn, .vista-option:not(.active)) svg:is([data-icono="borrar"], [data-icono="fallo"], [data-icono="lugar"], [data-icono="error"], [data-icono="cerrar"]) { color: var(--ic-rojo); }
+
+:is(.nav-tab, .menu-lateral-item, .section-title, .stat-icon, .empty-icon, .td-actions, .prov-card, .contact-chip, .task-meta-item, .auth-subtitle, .mobile-nav-icon, .detail-item, .toolbar, .tareas-filter-btn:not(.active), .vista-btn, .vista-option:not(.active)) svg:is([data-icono="ok"], [data-icono="exito"], [data-icono="aprobar"], [data-icono="telefono"], [data-icono="celular"], [data-icono="devolver"], [data-icono="exportar"], [data-icono="guardar"]) { color: var(--ic-verde); }
+
+:is(.nav-tab, .menu-lateral-item, .section-title, .stat-icon, .empty-icon, .td-actions, .prov-card, .contact-chip, .task-meta-item, .auth-subtitle, .mobile-nav-icon, .detail-item, .toolbar, .tareas-filter-btn:not(.active), .vista-btn, .vista-option:not(.active)) svg:is([data-icono="etiqueta"], [data-icono="calendario"], [data-icono="fecha"], [data-icono="reloj"], [data-icono="balanza"], [data-icono="imprimir"], [data-icono="paleta"], [data-icono="cohete"], [data-icono="repetir"], [data-icono="marco"]) { color: var(--ic-violeta); }
+
+:is(.nav-tab, .menu-lateral-item, .section-title, .stat-icon, .empty-icon, .td-actions, .prov-card, .contact-chip, .task-meta-item, .auth-subtitle, .mobile-nav-icon, .detail-item, .toolbar, .tareas-filter-btn:not(.active), .vista-btn, .vista-option:not(.active)) svg:is([data-icono="acuerdo"], [data-icono="planilla"], [data-icono="tabla"], [data-icono="camara"], [data-icono="imagen"], [data-icono="modulos"]) { color: var(--ic-teal); }
+
+/* Los botones de color (azul, verde, rojo lleno) llevan el ícono del mismo color que su texto: blanco. */
+[data-variant="primary"] svg, [data-variant="success"] svg, [data-variant="red"] svg { color: inherit !important; }

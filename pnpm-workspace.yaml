@@ -1,5 +1,10 @@
 allowBuilds:
   '@sentry/cli': true
   core-js: false
+  # PostgreSQL real que se baja como paquete (para las pruebas de concurrencia): su instalación arma los archivos del programa.
+  '@embedded-postgres/windows-x64': true
+  '@embedded-postgres/linux-x64': true
+  '@embedded-postgres/darwin-arm64': true
+  '@embedded-postgres/darwin-x64': true
 overrides:
   source-map-js: '>=1.2.2'

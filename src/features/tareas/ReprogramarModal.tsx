@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { fechaHoyISO } from '../../lib/fechaHoy';
@@ -21,7 +22,7 @@ export default function ReprogramarModal({ open, onClose, taskId, onReprogramada
   const [fecha, setFecha] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (open) setFecha(''); }, [open]);
+  useAlCambiar([open], () => { if (open) setFecha(''); });
 
   async function handleGuardar() {
     if (!taskId) return;

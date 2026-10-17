@@ -1,38 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import { useToast } from '../../components/ToastProvider';
 import { useConfiguracionQuery, useSaveConfiguracion } from '../config/useConfiguracion';
 import { NOMBRE_EMPRESA_POR_DEFECTO } from '../../lib/empresa';
-import { COLOR_DEPOSITO_ORIGINAL, COLOR_PRIMARIO_ORIGINAL, esColorValido, textoLegibleConBlanco } from '../../lib/marca';
+import { COLOR_PRIMARIO_ORIGINAL, esColorValido, textoLegibleConBlanco } from '../../lib/marca';
+import ColorMarca from '../../components/ColorMarca';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ZONAS_HORARIAS, ZONA_HORARIA_POR_DEFECTO } from '../../lib/zonasHorarias';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
-
-// Selector de un color de marca. Vacío ('') significa "el color original de la app".
-function ColorMarca({ etiqueta, valor, original, onChange }: { etiqueta: string; valor: string; original: string; onChange: (v: string) => void }) {
-  const efectivo = valor || original;
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-      <input
-        type="color"
-        aria-label={etiqueta}
-        value={efectivo}
-        onChange={e => onChange(e.target.value)}
-        style={{ width: 44, height: 34, padding: 2, border: '1.5px solid var(--border)', borderRadius: 6, background: 'var(--white)', cursor: 'pointer' }}
-      />
-      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{etiqueta}</span>
-      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{valor ? efectivo : 'original'}</span>
-      {valor && <Button type="button" variant="ghost" size="sm" onClick={() => onChange('')}>Volver al original</Button>}
-      {!textoLegibleConBlanco(efectivo) && (
-        <span style={{ width: '100%', fontSize: 12, color: 'var(--danger)' }}>
-          Es muy claro: el texto blanco de los encabezados y botones no se leería bien. Elegí uno más oscuro.
-        </span>
-      )}
-    </div>
-  );
-}
 
 export default function EmpresaPane() {
   const { data: config } = useConfiguracionQuery();
@@ -44,23 +22,27 @@ export default function EmpresaPane() {
   const [direccion, setDireccion] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
+  const [razonSocial, setRazonSocial] = useState('');
+  const [cuit, setCuit] = useState('');
+  const [web, setWeb] = useState('');
   const [logoBase64, setLogoBase64] = useState('');
   const [colorPrimario, setColorPrimario] = useState('');
-  const [colorDeposito, setColorDeposito] = useState('');
   const [zonaHoraria, setZonaHoraria] = useState(ZONA_HORARIA_POR_DEFECTO);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  useAlCambiar([config], () => {
     if (!config) return;
     setColorPrimario(esColorValido(config.color_primario) ? config.color_primario : '');
-    setColorDeposito(esColorValido(config.color_deposito) ? config.color_deposito : '');
     setZonaHoraria(config.zona_horaria || ZONA_HORARIA_POR_DEFECTO);
     setNombre(config.empresa_nombre ?? '');
     setDireccion(config.empresa_direccion ?? '');
     setTelefono(config.empresa_telefono ?? '');
     setEmail(config.empresa_email ?? '');
+    setRazonSocial(config.empresa_razon_social ?? '');
+    setCuit(config.empresa_cuit ?? '');
+    setWeb(config.empresa_web ?? '');
     setLogoBase64(config.logo_base64 ?? '');
-  }, [config]);
+  });
 
   function abrirSelectorDeLogo() {
     fileInputRef.current?.click();
@@ -75,8 +57,8 @@ export default function EmpresaPane() {
   }
 
   async function handleSave() {
-    if (!textoLegibleConBlanco(colorPrimario || COLOR_PRIMARIO_ORIGINAL) || !textoLegibleConBlanco(colorDeposito || COLOR_DEPOSITO_ORIGINAL)) {
-      toast('Uno de los colores es demasiado claro para el texto blanco. Elegí uno más oscuro.', 'error');
+    if (!textoLegibleConBlanco(colorPrimario || COLOR_PRIMARIO_ORIGINAL)) {
+      toast('El color es demasiado claro para el texto blanco. Elegí uno más oscuro.', 'error');
       return;
     }
     setSaving(true);
@@ -86,9 +68,11 @@ export default function EmpresaPane() {
         empresa_direccion: direccion.trim(),
         empresa_telefono: telefono.trim(),
         empresa_email: email.trim(),
+        empresa_razon_social: razonSocial.trim(),
+        empresa_cuit: cuit.trim(),
+        empresa_web: web.trim(),
         logo_base64: logoBase64,
         color_primario: colorPrimario || null,
-        color_deposito: colorDeposito || null,
         zona_horaria: zonaHoraria,
       });
       toast('Configuración guardada', 'success');
@@ -123,9 +107,12 @@ export default function EmpresaPane() {
           <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoChange} />
         </div>
         <div className="form-group"><label htmlFor="empresa-pane-1">Nombre de la empresa</label><Input id="empresa-pane-1" value={nombre} onChange={e => setNombre(e.target.value)} placeholder={NOMBRE_EMPRESA_POR_DEFECTO} /></div>
+        <div className="form-group"><label htmlFor="empresa-pane-rs">Razón social</label><Input id="empresa-pane-rs" maxLength={200} value={razonSocial} onChange={e => setRazonSocial(e.target.value)} placeholder="Como figura en los comprobantes" /></div>
+        <div className="form-group"><label htmlFor="empresa-pane-cuit">CUIT</label><Input id="empresa-pane-cuit" maxLength={20} inputMode="numeric" value={cuit} onChange={e => setCuit(e.target.value)} placeholder="30-00000000-0" /></div>
         <div className="form-group"><label htmlFor="empresa-pane-2">Dirección</label><Input id="empresa-pane-2" value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Av. Principal 1234" /></div>
         <div className="form-group"><label htmlFor="empresa-pane-3">Teléfono</label><Input id="empresa-pane-3" type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="(0000) 000-0000" /></div>
         <div className="form-group"><label htmlFor="empresa-pane-4">Email</label><Input id="empresa-pane-4" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="contacto@empresa.com" /></div>
+        <div className="form-group"><label htmlFor="empresa-pane-web">Sitio web</label><Input id="empresa-pane-web" type="url" maxLength={200} value={web} onChange={e => setWeb(e.target.value)} placeholder="www.empresa.com" /></div>
         <div className="form-group">
           <label htmlFor="empresa-pane-zona">Zona horaria</label>
           <Select id="empresa-pane-zona" value={zonaHoraria} onChange={e => setZonaHoraria(e.target.value)}>
@@ -135,9 +122,8 @@ export default function EmpresaPane() {
           <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Define qué día es "hoy" para las tareas y para corregir retiros del mismo día.</p>
         </div>
         <div className="form-group">
-          <label>Colores de la marca</label>
+          <label>Color de la marca</label>
           <ColorMarca etiqueta="Color principal" valor={colorPrimario} original={COLOR_PRIMARIO_ORIGINAL} onChange={setColorPrimario} />
-          <ColorMarca etiqueta="Color del Depósito" valor={colorDeposito} original={COLOR_DEPOSITO_ORIGINAL} onChange={setColorDeposito} />
         </div>
         <Button variant="primary" size="sm" style={{ width: '100%', justifyContent: 'center' }} onClick={() => void handleSave()} disabled={saving}>Guardar configuración</Button>
       </div>

@@ -1,13 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { isDirectorioDesactivado, isMantenimientoAdmin, puedeAjustarInventario, tieneAccesoMantenimiento } from '../lib/types';
+import { isDirectorioDesactivado, isDepositoAdmin, puedeAjustarInventario, tieneAccesoAdmin, tieneAccesoDeposito } from '../lib/types';
 import UserMenu from '../components/UserMenu';
 import MobileMenu from '../components/MobileMenu';
+import MenuLateral from '../components/MenuLateral';
+import BotonHamburguesa from '../components/BotonHamburguesa';
+import { useMenuFijo } from '../lib/useMenuFijo';
+import { useAvisos } from '../features/avisos/useAvisos';
+import type { SeccionMenu } from '../components/MenuLateral';
 import SinModulos from '../components/SinModulos';
 import { hayModulosDeDirectorio } from '../lib/modulos';
 import { useConfiguracionQuery } from '../features/config/useConfiguracion';
 import { useModulos } from '../features/config/useModulos';
+import { useDepositoVisible } from '../features/depositos/useDepositos';
 import { RetiroCartProvider, useRetiroCart } from '../features/retiros/RetiroCartContext';
 import ItemsList from '../features/items/ItemsList';
 import InformeReposicion from '../features/items/InformeReposicion';
@@ -26,16 +32,19 @@ function MantenimientoContent() {
   const { cart } = useRetiroCart();
   const { data: config } = useConfiguracionQuery();
   const { modulos, integ } = useModulos();
+  const depositoVisible = useDepositoVisible();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('buscar');
   const [menuOpen, setMenuOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [menuFijo, alternarMenuFijo] = useMenuFijo();
+  const { retiros: retirosNuevos, sugerencias: sugerenciasNuevas, total: avisosTotal, marcarVisto } = useAvisos();
 
   const nombreEmpresa = config?.empresa_nombre || 'Mi Empresa';
   useEffect(() => { document.title = `Depósito — ${nombreEmpresa}`; }, [nombreEmpresa]);
   // Reparaciones toca stock igual que retiros/edición de repuestos — se
   // reserva a admin de Mantenimiento, no satura la navegación del común.
-  const esAdmin = isMantenimientoAdmin(profile);
+  const esAdmin = isDepositoAdmin(profile);
   const verReparaciones = esAdmin && integ.reparaciones;
   // Ajuste de inventario: solo quien tiene el permiso (la base lo impone igual).
   const verAjustes = puedeAjustarInventario(profile);
@@ -45,60 +54,56 @@ function MantenimientoContent() {
   // (o si la empresa no usa ningún módulo del Directorio: no hay a dónde volver).
   const canExit = !isDirectorioDesactivado(profile) && hayModulosDeDirectorio(modulos);
 
+  // Las secciones se agrupan por para qué se usan. Cuando haya más áreas (Compras, etc.) se suman acá como grupos nuevos.
+  const ir = (t: Tab) => () => setTab(t);
+  const secciones: SeccionMenu[] = [
+    { titulo: 'Día a día', items: [
+      { clave: 'buscar', icono: <Icono n="buscar" />, titulo: 'Buscar', onClick: ir('buscar'), activo: tab === 'buscar' },
+      { clave: 'carrito', icono: <Icono n="carrito" />, titulo: 'A retirar', cantidad: cart.length, onClick: ir('carrito'), activo: tab === 'carrito' },
+      { clave: 'retiros', icono: <Icono n="lista" />, titulo: 'Retiros', cantidad: retirosNuevos, onClick: ir('retiros'), activo: tab === 'retiros' },
+    ] },
+    { titulo: 'Stock', items: [
+      ...(verAjustes ? [{ clave: 'ajustes', icono: <Icono n="balanza" />, titulo: 'Movimientos', onClick: ir('ajustes'), activo: tab === 'ajustes' }] : []),
+      ...(esAdmin ? [{ clave: 'informe', icono: <Icono n="informe" />, titulo: 'Informe', onClick: ir('informe'), activo: tab === 'informe' }] : []),
+      ...(verReparaciones ? [{ clave: 'reparaciones', icono: <Icono n="herramienta" />, titulo: 'Reparaciones', onClick: ir('reparaciones'), activo: tab === 'reparaciones' }] : []),
+    ] },
+    { titulo: 'Gestión', items: [
+      ...(modulos.tareas ? [{ clave: 'tareas', icono: <Icono n="exito" />, titulo: 'Tareas', onClick: ir('tareas'), activo: tab === 'tareas' }] : []),
+    ] },
+  ].filter(s => s.items.length > 0);
+  // Las áreas a las que puede ir esta persona (si tiene una sola, no hace falta mostrarlas).
+  const areas: SeccionMenu[] = canExit ? [{ titulo: 'Áreas', items: [
+    { clave: 'area-directorio', icono: <Icono n="directorio" />, titulo: 'Directorio', onClick: () => navigate('/') },
+    { clave: 'area-deposito', icono: <Icono n={depositoVisible.icono} />, titulo: depositoVisible.nombre, onClick: ir('buscar'), activo: true },
+  ] }] : [];
+  const pie = tieneAccesoAdmin(profile) ? [{ clave: 'config', icono: <Icono n="config" />, titulo: 'Configuración', cantidad: sugerenciasNuevas, onClick: () => navigate('/admin') }] : [];
+
+  // El menú de la hamburguesa (celular) usa las mismas secciones, en una sola lista.
   const navItems = [
-    { icon: <Icono n="buscar" />, label: 'Buscar', onClick: () => setTab('buscar'), active: tab === 'buscar' },
-    { icon: <Icono n="carrito" />, label: `A retirar${cart.length ? ` (${cart.length})` : ''}`, onClick: () => setTab('carrito'), active: tab === 'carrito' },
-    { icon: <Icono n="lista" />, label: 'Retiros', onClick: () => setTab('retiros'), active: tab === 'retiros' },
-    ...(verReparaciones ? [{ icon: <Icono n="herramienta" />, label: 'Reparaciones', onClick: () => setTab('reparaciones'), active: tab === 'reparaciones' }] : []),
-    ...(modulos.tareas ? [{ icon: <Icono n="exito" />, label: 'Tareas', onClick: () => setTab('tareas'), active: tab === 'tareas' }] : []),
-    ...(esAdmin ? [{ icon: <Icono n="informe" />, label: 'Informe', onClick: () => setTab('informe'), active: tab === 'informe' }] : []),
-    ...(verAjustes ? [{ icon: <Icono n="balanza" />, label: 'Ajustes', onClick: () => setTab('ajustes'), active: tab === 'ajustes' }] : []),
+    ...secciones.flatMap(s => s.items).map(i => ({ icon: i.icono, label: i.titulo, cantidad: i.cantidad, onClick: i.onClick, active: i.activo })),
     ...(canExit ? [{ icon: <><Icono n="volver" /> </>, label: 'Volver a Directorio', onClick: () => navigate('/') }] : []),
   ];
 
+  // Al estar mirando los retiros, lo que llegue ya está visto.
+  useEffect(() => { if (tab === 'retiros' && retirosNuevos > 0) marcarVisto('retiros'); }, [tab, retirosNuevos, marcarVisto]);
+
   return (
-    <div className="mantenimiento-screen">
+    <div className={`deposito-screen con-menu-lateral${menuFijo ? ' menu-fijo' : ''}`}>
       <header className="app-header">
         <div className="header-logo">
           {config?.logo_base64 && <img src={config.logo_base64} alt={nombreEmpresa} />}
           <div>
             <div className="header-logo-fallback">{nombreEmpresa}</div>
-            <div className="header-title">Depósito de mantenimiento</div>
+            <h1 className="header-title">{depositoVisible.nombre}</h1>
           </div>
         </div>
         <div className="header-right">
-          {canExit && (
-            <Link to="/" className="btn-volver-directorio" style={{ display: 'flex' }}><Icono n="volver" /> <span className="hide-mobile">Directorio</span></Link>
-          )}
           <UserMenu />
-          <button className="hamburger-btn" onClick={() => setMenuOpen(true)} aria-label="Menú">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
+          <BotonHamburguesa onClick={() => setMenuOpen(true)} aviso={cart.length + avisosTotal > 0} />
         </div>
       </header>
 
-      <nav className="app-nav">
-        <button className={`nav-tab${tab === 'buscar' ? ' active' : ''}`} onClick={() => setTab('buscar')}><Icono n="buscar" /> Buscar</button>
-        <button className={`nav-tab${tab === 'carrito' ? ' active' : ''}`} onClick={() => setTab('carrito')}>
-          
-          <Icono n="carrito" /> A retirar {cart.length > 0 && <span className="badge badge-rubro">{cart.length}</span>}
-        </button>
-        <button className={`nav-tab${tab === 'retiros' ? ' active' : ''}`} onClick={() => setTab('retiros')}><Icono n="lista" /> Retiros</button>
-        {modulos.tareas && (
-          <button className={`nav-tab${tab === 'tareas' ? ' active' : ''}`} onClick={() => setTab('tareas')}><Icono n="exito" /> Tareas</button>
-        )}
-        {verReparaciones && (
-          <button className={`nav-tab${tab === 'reparaciones' ? ' active' : ''}`} onClick={() => setTab('reparaciones')}><Icono n="herramienta" /> Reparaciones</button>
-        )}
-        {esAdmin && (
-          <button className={`nav-tab${tab === 'informe' ? ' active' : ''}`} onClick={() => setTab('informe')}><Icono n="informe" /> Informe</button>
-        )}
-        {verAjustes && (
-          <button className={`nav-tab${tab === 'ajustes' ? ' active' : ''}`} onClick={() => setTab('ajustes')}><Icono n="balanza" /> Ajustes</button>
-        )}
-      </nav>
+      <MenuLateral secciones={[...areas, ...secciones]} pie={pie} fijo={menuFijo} onAlternarFijo={alternarMenuFijo} />
 
       <main className="app-main">
         {tab === 'buscar' && (
@@ -123,13 +128,13 @@ function MantenimientoContent() {
   );
 }
 
-export default function MantenimientoPage() {
+export default function DepositoPage() {
   const { profile } = useAuth();
   const { modulos, listo } = useModulos();
   if (!listo) return <div className="loading-screen">Cargando...</div>;
   // Con Directorio desactivado, esta pantalla es la única a la que puede
   // entrar, tenga o no un rol de Mantenimiento propio asignado.
-  if (!tieneAccesoMantenimiento(profile) && !isDirectorioDesactivado(profile)) return <Navigate to="/" replace />;
+  if (!tieneAccesoDeposito(profile) && !isDirectorioDesactivado(profile)) return <Navigate to="/" replace />;
   // Si la empresa no usa el Depósito, no hay pantalla: se vuelve al Directorio, salvo que la
   // persona no pueda entrar allí (entonces se le explica en vez de rebotarla en círculo).
   if (!modulos.deposito) return isDirectorioDesactivado(profile) ? <SinModulos /> : <Navigate to="/" replace />;

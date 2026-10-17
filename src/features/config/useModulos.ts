@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { TODOS_ACTIVOS, integraciones, resolverModulos } from '../../lib/modulos';
 
@@ -11,6 +11,8 @@ import { TODOS_ACTIVOS, integraciones, resolverModulos } from '../../lib/modulos
 interface Crudo { modulos: unknown; componentes: unknown; apagados: unknown }
 
 async function leerLicencia(): Promise<Crudo | null> {
+  // Las preferencias del dueño se piden a la vez que la licencia (no una después de la otra).
+  const pedidoPreferencias = supabase.from('preferencias_modulos').select('apagados').eq('id', 1).maybeSingle();
   // "componentes" existe desde que se instaló la licencia por componentes; en una base más vieja se lee sin él.
   let fila: { modulos: unknown; componentes?: unknown } | null = null;
   const conComponentes = await supabase.from('licencia').select('modulos, componentes').eq('id', 1).maybeSingle();
@@ -21,15 +23,16 @@ async function leerLicencia(): Promise<Crudo | null> {
   } else fila = conComponentes.data;
   if (!fila) return null;
   // Las preferencias del dueño también son nuevas: si todavía no existen, no hay nada apagado.
-  const pref = await supabase.from('preferencias_modulos').select('apagados').eq('id', 1).maybeSingle();
+  const pref = await pedidoPreferencias;
   return { modulos: fila.modulos, componentes: fila.componentes ?? null, apagados: pref.error ? {} : (pref.data?.apagados ?? {}) };
 }
 
+// Se define aparte para poder pedirla apenas hay sesión, sin esperar a que se dibuje la pantalla (ver AuthContext).
+export const opcionesLicencia = queryOptions({ queryKey: ['licencia'], queryFn: leerLicencia, staleTime: 60_000 });
+
 export function useModulos() {
   const { data, isLoading } = useQuery({
-    queryKey: ['licencia'],
-    queryFn: leerLicencia,
-    staleTime: 60_000,
+    ...opcionesLicencia,
     // Se vuelve a leer cada minuto: un cambio de licencia llega a las pantallas abiertas sin recargar.
     refetchInterval: 60_000,
   });

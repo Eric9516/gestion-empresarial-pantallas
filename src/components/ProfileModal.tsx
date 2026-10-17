@@ -1,28 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../lib/useAlCambiar';
 import Modal from './Modal';
 import { useToast } from './ToastProvider';
 import { useAuth } from '../auth/AuthContext';
-import { isDirectorioAdmin, isDirectorioDesactivado, isMantenimientoAdmin, isOwner, tieneAccesoMantenimiento } from '../lib/types';
+import { isDirectorioAdmin, isDirectorioDesactivado, isDepositoAdmin, isOwner, tieneAccesoDeposito } from '../lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useModulos } from '../features/config/useModulos';
+import { useDepositoVisible } from '../features/depositos/useDepositos';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
+import { permisosDe } from '../features/perfil/permisos';
+import { AyudaDelPerfil, DatosDeLaCuenta, PermisosDelPerfil, SeguridadDelPerfil } from '../features/perfil/SeccionesDePerfil';
 
 export default function ProfileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { profile, updateOwnProfile } = useAuth();
+  const { profile, user, updateOwnProfile } = useAuth();
   const toast = useToast();
   const { modulos } = useModulos();
+  const depositoVisible = useDepositoVisible();
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  useAlCambiar([open, profile], () => {
     if (open) {
       setNombre(profile?.nombre ?? '');
       setApellido(profile?.apellido ?? '');
     }
-  }, [open, profile]);
+  });
 
   async function handleSave() {
     if (!nombre.trim()) { toast('El nombre es obligatorio', 'error'); return; }
@@ -39,8 +44,9 @@ export default function ProfileModal({ open, onClose }: { open: boolean; onClose
   }
 
   const rolDirectorio = isDirectorioDesactivado(profile) ? 'Sin acceso' : isDirectorioAdmin(profile) ? 'Administrador' : 'Usuario';
-  const rolMantenimiento = !tieneAccesoMantenimiento(profile) ? 'Sin acceso' : isMantenimientoAdmin(profile) ? 'Administrador' : 'Usuario';
-  const filasRol = [['Directorio', rolDirectorio], ...(modulos.deposito ? [['Depósito de mantenimiento', rolMantenimiento]] : [])];
+  const rolDeposito = !tieneAccesoDeposito(profile) ? 'Sin acceso' : isDepositoAdmin(profile) ? 'Administrador' : 'Usuario';
+  const permisos = permisosDe({ profile, deposito: modulos.deposito });
+  const filasRol = [['Directorio', rolDirectorio], ...(modulos.deposito ? [[depositoVisible.nombre, rolDeposito]] : [])];
 
   return (
     <Modal
@@ -73,6 +79,10 @@ export default function ProfileModal({ open, onClose }: { open: boolean; onClose
           </div>
         ))}
       </div>
+      <PermisosDelPerfil permisos={permisos} />
+      <DatosDeLaCuenta profile={profile} user={user} />
+      <SeguridadDelPerfil email={profile?.email} />
+      <AyudaDelPerfil permisos={permisos.filter(p => p.tiene)} />
     </Modal>
   );
 }

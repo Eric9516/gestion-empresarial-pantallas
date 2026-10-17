@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useVistaDeLista } from '../lib/useVistaDeLista';
 
 export interface Column<T> {
   header: string;
@@ -19,14 +20,15 @@ interface Props<T> {
 // La app vieja repetía esto a mano en cada pantalla (Proveedores, Comisionistas,
 // Repuestos, Historial); acá es un solo componente que todas comparten, y por eso
 // mismo ninguna se puede "olvidar" la vista mobile como pasó la primera vez.
-// El CSS (.table-wrap / .prov-cards) ya se encarga de mostrar una u otra según
-// el ancho de pantalla — no hace falta lógica de JS para decidir cuál mostrar.
+// El CSS (.table-wrap / .prov-cards) muestra una u otra según el ancho de pantalla, y además solo se dibuja la que se ve (useVistaDeLista, mismo
+// punto de corte): con cientos de filas, dibujar las dos duplicaba el trabajo. Si el navegador no permite saber el ancho, se dibujan las dos como antes.
 export default function ResponsiveList<T>({ columns, data, renderCard, keyField, emptyIcon, emptyTitle, emptyDescription }: Props<T>) {
+  const vista = useVistaDeLista();
   if (!data.length) {
     return (
       <div className="empty-state">
         <div className="empty-icon">{emptyIcon}</div>
-        <h3>{emptyTitle}</h3>
+        <h2>{emptyTitle}</h2>
         <p>{emptyDescription}</p>
       </div>
     );
@@ -34,10 +36,10 @@ export default function ResponsiveList<T>({ columns, data, renderCard, keyField,
 
   return (
     <>
-      <div className="table-wrap">
+      {vista !== 'tarjetas' && <div className="table-wrap">
         <table>
           <thead>
-            <tr>{columns.map(c => <th key={c.header}>{c.header}</th>)}</tr>
+            <tr>{columns.map(c => <th key={c.header}>{c.header || <span className="sr-only">Acciones</span>}</th>)}</tr>
           </thead>
           <tbody>
             {data.map(row => (
@@ -47,10 +49,10 @@ export default function ResponsiveList<T>({ columns, data, renderCard, keyField,
             ))}
           </tbody>
         </table>
-      </div>
-      <div className="prov-cards">
+      </div>}
+      {vista !== 'tabla' && <div className="prov-cards">
         {data.map(row => <div key={keyField(row)}>{renderCard(row)}</div>)}
-      </div>
+      </div>}
     </>
   );
 }

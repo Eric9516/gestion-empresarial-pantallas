@@ -182,3 +182,6 @@
   }
   .campo-custom-row .btn-remove-contact { grid-row: auto; grid-column: auto; align-self: auto; }
 }
+
+/* Número rojo de novedades dentro de una pestaña (por ejemplo, sugerencias nuevas). */
+.admin-subtab .aviso-numero, .admin-group-tab .aviso-numero { margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; line-height: 18px; vertical-align: middle; }

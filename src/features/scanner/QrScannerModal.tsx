@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from '../../components/Modal';
-import { useItemsQuery } from '../items/useItems';
+import { buscarRepuestoPorCodigo } from '../items/useItems';
 import { useRetiroCart } from '../retiros/RetiroCartContext';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
@@ -15,7 +15,6 @@ interface Props {
 }
 
 export default function QrScannerModal({ open, onClose, onListo }: Props) {
-  const { data: items } = useItemsQuery();
   const { cart, addItem, removeItem } = useRetiroCart();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -102,21 +101,26 @@ export default function QrScannerModal({ open, onClose, onListo }: Props) {
     ultimoCodigoRef.current = codigo;
     ultimoTimestampRef.current = ahora;
 
-    const item = items?.find(it => it.codigo === codigo);
-    if (!item) {
-      setStatus(<><Icono n="fallo" /> Código "{codigo}" no encontrado en el catálogo</>);
+    // El repuesto se busca por su código en la base (una consulta chica), no en una lista descargada.
+    void buscarRepuestoPorCodigo(codigo).then(item => {
+      if (!item) {
+        setStatus(<><Icono n="fallo" /> Código "{codigo}" no encontrado en el catálogo</>);
+        setStatusColor('danger');
+      } else {
+        addItem(item);
+        setStatus(<><Icono n="ok" /> {item.codigo} agregado — seguí escaneando</>);
+        setStatusColor('success');
+      }
+    }).catch(() => {
+      setStatus(<><Icono n="fallo" /> No se pudo consultar el catálogo: probá de nuevo</>);
       setStatusColor('danger');
-    } else {
-      addItem(item);
-      setStatus(<><Icono n="ok" /> {item.codigo} agregado — seguí escaneando</>);
-      setStatusColor('success');
-    }
-
-    window.clearTimeout(statusTimeoutRef.current);
-    statusTimeoutRef.current = window.setTimeout(() => {
-      setStatus(MENSAJE_INICIAL);
-      setStatusColor('muted');
-    }, 1800);
+    }).finally(() => {
+      window.clearTimeout(statusTimeoutRef.current);
+      statusTimeoutRef.current = window.setTimeout(() => {
+        setStatus(MENSAJE_INICIAL);
+        setStatusColor('muted');
+      }, 1800);
+    });
   }
 
   function handleClose() {

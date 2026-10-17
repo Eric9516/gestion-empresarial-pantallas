@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { fechaHoyISO } from '../../lib/fechaHoy';
@@ -27,14 +28,14 @@ export default function TareaForm({ open, onClose, tarea }: Props) {
   const [fecha, setFecha] = useState(fechaHoyISO());
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  useAlCambiar([open, tarea], () => {
     if (!open) return;
     if (tarea) {
       setTitulo(tarea.title); setDescripcion(tarea.description ?? ''); setSemaforo(tarea.traffic_level);
     } else {
       setTitulo(''); setDescripcion(''); setSemaforo('green'); setFecha(fechaHoyISO());
     }
-  }, [open, tarea]);
+  });
 
   async function handleGuardar() {
     if (!titulo.trim()) { toast('El título es obligatorio', 'error'); return; }

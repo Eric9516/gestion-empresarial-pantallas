@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { generarQRPDF, type FormatoEtiqueta } from '../../lib/generarQrPdf';
 import FormatoEtiquetaSelect from './FormatoEtiquetaSelect';
-import { prepararBusqueda, puntajeConBusquedaPreparada, useItemsQuery } from './useItems';
+import { useRepuestosParaElegir } from './useItems';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icono } from '@/components/Icono';
@@ -16,7 +16,6 @@ interface Seleccion {
 }
 
 export default function GenerarQrModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { data: items } = useItemsQuery();
   const toast = useToast();
 
   const [busqueda, setBusqueda] = useState('');
@@ -25,11 +24,7 @@ export default function GenerarQrModal({ open, onClose }: { open: boolean; onClo
   const [pendiente, setPendiente] = useState<{ item_id: string; codigo: string; descripcion: string } | null>(null);
   const [cantidadInput, setCantidadInput] = useState('1');
 
-  const resultados = useMemo(() => {
-    if (!busqueda.trim() || !items) return [];
-    const terminos = prepararBusqueda(busqueda);
-    return items.filter(it => puntajeConBusquedaPreparada(it, terminos) > 0).slice(0, 15);
-  }, [items, busqueda]);
+  const resultados = useRepuestosParaElegir(busqueda);
 
   function handleClose() {
     setBusqueda('');

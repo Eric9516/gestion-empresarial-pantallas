@@ -1,7 +1,7 @@
 import type { EstadoLinea } from './useReparaciones';
 
 const COLOR_ESTADO: Record<EstadoLinea, { bg: string; fg: string; label: string }> = {
-  pendiente: { bg: '#fbf1de', fg: '#9a6a0a', label: 'Pendiente' },
+  pendiente: { bg: '#fbf1de', fg: '#7a5408', label: 'Pendiente' },
   parcial: { bg: '#eaf0fb', fg: 'var(--blue)', label: 'Parcial' },
   cerrada: { bg: 'var(--success-bg)', fg: 'var(--success)', label: 'Cerrada' },
 };

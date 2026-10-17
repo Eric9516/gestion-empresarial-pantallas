@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { cursorSiguiente, POR_PAGINA, type Cursor } from '../../lib/paginacion';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../auth/AuthContext';
 import { puedeVerTodosLosRetiros } from '../../lib/types';
@@ -29,6 +31,15 @@ async function fetchUsuariosPerfil() {
   return data;
 }
 
+// El stock no puede quedar negativo (lo hace cumplir la base). Antes de confirmar se mira el stock de ahora de cada línea y se avisa de TODAS las que no alcanzan juntas,
+// en vez de que la base rechace el retiro por la primera. (Si en el medio otra persona saca el último, la base igual lo rechaza: esto es solo para avisar mejor.)
+export async function stockQueFalta(lineas: { item_id: string; codigo: string; cantidad: number }[]) {
+  const { data, error } = await supabase.from('items').select('id, stock').in('id', lineas.map(l => l.item_id));
+  if (error) throw error;
+  const hay = new Map((data ?? []).map(r => [r.id, r.stock ?? 0]));
+  return lineas.filter(l => l.cantidad > (hay.get(l.item_id) ?? 0)).map(l => ({ codigo: l.codigo, hay: hay.get(l.item_id) ?? 0, pide: l.cantidad }));
+}
+
 export function useConfirmarRetiro() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -36,18 +47,14 @@ export function useConfirmarRetiro() {
   return useMutation({
     mutationFn: async ({ sectorId, observacionGeneral, items }: { sectorId: string; observacionGeneral: string; items: RetiroCartLine[] }) => {
       if (!profile) throw new Error('Sesión no disponible');
-      const { data: retiro, error } = await supabase
-        .from('retiros')
-        .insert({ usuario_id: profile.id, sector_id: sectorId, observacion_general: observacionGeneral || null })
-        .select()
-        .single();
+      // Una sola operación en la base: el retiro y todas sus líneas, o nada (antes eran dos pedidos y si fallaba el segundo quedaba un retiro vacío).
+      const { data, error } = await supabase.rpc('confirmar_retiro', {
+        p_sector_id: sectorId,
+        p_observacion: observacionGeneral,
+        p_lineas: items.map(line => ({ item_id: line.item_id, cantidad: line.cantidad, observacion: line.observacion || '' })),
+      });
       if (error) throw error;
-
-      const { error: itemsError } = await supabase.from('retiro_items').insert(
-        items.map(line => ({ retiro_id: retiro.id, item_id: line.item_id, cantidad: line.cantidad, observacion: line.observacion || null }))
-      );
-      if (itemsError) throw itemsError;
-      return retiro.id;
+      return data;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['historial-retiros'] });
@@ -57,30 +64,45 @@ export function useConfirmarRetiro() {
   });
 }
 
-export function useHistorialRetirosQuery(fechaFiltro: string, usuarioFiltro: string) {
+// Las líneas de un retiro vienen armadas desde la base.
+interface LineaDeRetiro { id: string; cantidad: number | string; observacion: string | null; codigo: string | null; descripcion: string | null }
+
+// El historial de retiros se pide de a páginas (los más nuevos primero) y la búsqueda, la fecha y el usuario los filtra la base. Sin fecha, son los últimos 30 días.
+export function useHistorialRetirosQuery(fechaFiltro: string, usuarioFiltro: string, texto = '') {
   const { profile } = useAuth();
   const admin = puedeVerTodosLosRetiros(profile);
+  const busqueda = texto.trim();
 
-  const retirosQuery = useQuery({
-    queryKey: ['historial-retiros', fechaFiltro, admin],
-    queryFn: async () => {
-      let query = supabase
-        .from('retiros')
-        .select('id, usuario_id, created_at, observacion_general, sectores(nombre), retiro_items(id, cantidad, observacion, items(codigo, descripcion))')
-        .order('created_at', { ascending: false });
-
+  const retirosQuery = useInfiniteQuery({
+    queryKey: ['historial-retiros', fechaFiltro, usuarioFiltro, busqueda, admin],
+    initialPageParam: null as Cursor | null,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ pageParam }): Promise<RetiroHistorial[]> => {
+      let desde: string;
+      let hasta: string | undefined;
       if (fechaFiltro) {
-        query = query.gte('created_at', inicioDelDiaISO(fechaFiltro)).lte('created_at', finDelDiaISO(fechaFiltro));
+        desde = inicioDelDiaISO(fechaFiltro);
+        hasta = finDelDiaISO(fechaFiltro);
       } else {
-        const desde = new Date();
-        desde.setDate(desde.getDate() - 30);
-        query = query.gte('created_at', desde.toISOString());
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        desde = d.toISOString();
       }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc('historial_de_retiros', {
+        p_texto: busqueda || undefined, p_desde: desde, p_hasta: hasta, p_usuario: usuarioFiltro || undefined,
+        p_antes_en: pageParam?.created_at, p_antes_id: pageParam?.id, p_limite: POR_PAGINA,
+      });
       if (error) throw error;
-      return data as unknown as RetiroHistorial[];
+      return (data ?? []).map(r => ({
+        id: r.id, usuario_id: r.usuario_id, created_at: r.created_at, observacion_general: r.observacion_general,
+        sectores: r.sector ? { nombre: r.sector } : null,
+        retiro_items: ((r.lineas ?? []) as unknown as LineaDeRetiro[]).map(l => ({
+          id: l.id, cantidad: Number(l.cantidad), observacion: l.observacion,
+          items: l.codigo === null && l.descripcion === null ? null : { codigo: l.codigo ?? '', descripcion: l.descripcion ?? '' },
+        })),
+      }));
     },
+    getNextPageParam: pagina => cursorSiguiente(pagina),
   });
 
   const usuariosQuery = useQuery({
@@ -89,9 +111,13 @@ export function useHistorialRetirosQuery(fechaFiltro: string, usuarioFiltro: str
     queryFn: fetchUsuariosPerfil,
   });
 
-  const retiros = (retirosQuery.data ?? []).filter(r => !usuarioFiltro || r.usuario_id === usuarioFiltro);
+  const retiros = useMemo(() => retirosQuery.data?.pages.flat() ?? [], [retirosQuery.data]);
 
-  return { retiros, admin, usuarios: usuariosQuery.data ?? [], isLoading: retirosQuery.isLoading, isError: retirosQuery.isError };
+  return {
+    retiros, admin, usuarios: usuariosQuery.data ?? [], isLoading: retirosQuery.isLoading, isError: retirosQuery.isError,
+    hayMas: !!retirosQuery.hasNextPage, cargandoMas: retirosQuery.isFetchingNextPage, verMas: () => void retirosQuery.fetchNextPage(),
+    buscando: retirosQuery.isFetching && !retirosQuery.isFetchingNextPage,
+  };
 }
 
 export function useUpdateHistorialCantidad() {
@@ -110,6 +136,28 @@ export function useUpdateHistorialCantidad() {
 }
 
 // ===== EXPORTAR A EXCEL (admin) =====
+
+const COLUMNAS_RETIRO = 'id, usuario_id, created_at, observacion_general, sectores(nombre), retiro_items(id, cantidad, observacion, items(codigo, descripcion))';
+const TANDA_DE_EXPORTACION = 500;
+
+// Lee los retiros que se van a exportar de a 500 (del más viejo al más nuevo), para no pedir miles de retiros en un solo pedido.
+async function leerRetirosParaExportar(filtro: { pendientes: true } | { desde: string; hasta: string }): Promise<RetiroParaExportar[]> {
+  const todos: RetiroParaExportar[] = [];
+  let cursor: Cursor | null = null;
+  for (;;) {
+    let q = supabase.from('retiros').select(COLUMNAS_RETIRO + ', exportado').order('created_at', { ascending: true }).order('id', { ascending: true }).limit(TANDA_DE_EXPORTACION);
+    if ('pendientes' in filtro) q = q.eq('exportado', false);
+    else q = q.gte('created_at', inicioDelDiaISO(filtro.desde)).lte('created_at', finDelDiaISO(filtro.hasta));
+    if (cursor) q = q.or(`created_at.gt."${cursor.created_at}",and(created_at.eq."${cursor.created_at}",id.gt."${cursor.id}")`);
+    const { data, error } = await q;
+    if (error) throw error;
+    const tanda = (data ?? []) as unknown as RetiroParaExportar[];
+    todos.push(...tanda);
+    if (tanda.length < TANDA_DE_EXPORTACION) return todos;
+    const ultimo = tanda[tanda.length - 1];
+    cursor = { created_at: ultimo.created_at, id: ultimo.id };
+  }
+}
 
 interface RetiroParaExportar extends RetiroHistorial {
   exportado?: boolean;
@@ -146,19 +194,16 @@ export function useExportarRetirosPendientes() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const { data: retiros, error } = await supabase
-        .from('retiros')
-        .select('id, usuario_id, created_at, observacion_general, sectores(nombre), retiro_items(id, cantidad, observacion, items(codigo, descripcion))')
-        .eq('exportado', false)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
+      const retiros = await leerRetirosParaExportar({ pendientes: true });
       if (!retiros?.length) return 0;
 
       const usuarios = await fetchUsuariosPorId();
-      await exportarExcel(retirosAFilas(retiros as unknown as RetiroParaExportar[], usuarios), 'Retiros', `retiros_pendientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await exportarExcel(retirosAFilas(retiros, usuarios), 'Retiros', `retiros_pendientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-      for (const r of retiros) {
-        await supabase.from('retiros').update({ exportado: true }).eq('id', r.id);
+      // Se marcan de a 100 por pedido (no uno por uno).
+      for (let i = 0; i < retiros.length; i += 100) {
+        const { error: errMarca } = await supabase.from('retiros').update({ exportado: true }).in('id', retiros.slice(i, i + 100).map(r => r.id));
+        if (errMarca) throw errMarca;
       }
       return retiros.length;
     },
@@ -169,17 +214,11 @@ export function useExportarRetirosPendientes() {
 export function useExportarRetirosPeriodo() {
   return useMutation({
     mutationFn: async ({ desde, hasta }: { desde: string; hasta: string }) => {
-      const { data: retiros, error } = await supabase
-        .from('retiros')
-        .select('id, usuario_id, created_at, observacion_general, sectores(nombre), retiro_items(id, cantidad, observacion, items(codigo, descripcion))')
-        .gte('created_at', inicioDelDiaISO(desde))
-        .lte('created_at', finDelDiaISO(hasta))
-        .order('created_at', { ascending: true });
-      if (error) throw error;
+      const retiros = await leerRetirosParaExportar({ desde, hasta });
       if (!retiros?.length) return 0;
 
       const usuarios = await fetchUsuariosPorId();
-      await exportarExcel(retirosAFilas(retiros as unknown as RetiroParaExportar[], usuarios), 'Retiros', `retiros_${desde}_a_${hasta}.xlsx`);
+      await exportarExcel(retirosAFilas(retiros, usuarios), 'Retiros', `retiros_${desde}_a_${hasta}.xlsx`);
       return retiros.length;
     },
   });

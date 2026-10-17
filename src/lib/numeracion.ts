@@ -32,7 +32,14 @@ export interface AnalisisDeNumeros {
   ultimo: string | null;
   /** Repuestos que ya existen con el número cargado pero sin descripción: conviene completarlos en vez de crear otro. */
   enBlanco: RepuestoNumerado[];
+  /** Números libres en el medio (entre el 1 y el más alto usado): los primeros, con ceros a la izquierda. */
+  huecos: string[];
+  /** Cuántos números libres hay en el medio en total (puede ser más que los que trae `huecos`). */
+  totalHuecos: number;
 }
+
+// Con tantos huecos se muestran solo los primeros: el resto se ve al ir usándolos.
+export const HUECOS_VISIBLES = 8;
 
 const aEntero = (numero: string): number | null => (/^\d+$/.test(numero.trim()) ? parseInt(numero, 10) : null);
 
@@ -43,7 +50,16 @@ export function numeroConCeros(n: number): string {
 // `repuestos` son TODOS los de la subfamilia, también los desactivados: su número sigue ocupado en la base.
 export function analizarNumeros(repuestos: RepuestoNumerado[]): AnalisisDeNumeros {
   let max = 0;
-  for (const r of repuestos) { const n = aEntero(r.numero); if (n !== null && n > max) max = n; }
+  const usados = new Set<number>();
+  for (const r of repuestos) { const n = aEntero(r.numero); if (n !== null) { usados.add(n); if (n > max) max = n; } }
+  // Huecos: números que nadie usa entre el 1 y el más alto. Una sola pasada sobre lo que ya está cargado (como mucho 99.998 vueltas, sin consultas nuevas).
+  const huecos: string[] = [];
+  let totalHuecos = 0;
+  for (let n = 1; n < max && n <= MAXIMO; n++) {
+    if (usados.has(n)) continue;
+    totalHuecos++;
+    if (huecos.length < HUECOS_VISIBLES) huecos.push(numeroConCeros(n));
+  }
   const enBlanco = repuestos
     .filter(r => !(r.descripcion ?? '').trim())
     .sort((a, b) => (aEntero(a.numero) ?? 0) - (aEntero(b.numero) ?? 0));
@@ -51,6 +67,8 @@ export function analizarNumeros(repuestos: RepuestoNumerado[]): AnalisisDeNumero
     siguiente: max >= MAXIMO ? null : numeroConCeros(max + 1),
     ultimo: max > 0 ? numeroConCeros(max) : null,
     enBlanco,
+    huecos,
+    totalHuecos,
   };
 }
 

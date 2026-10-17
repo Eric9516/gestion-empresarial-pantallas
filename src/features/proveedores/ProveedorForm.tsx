@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { mensajeDeError } from '@/lib/errores';
+import { ConflictoDeEdicion } from '../../lib/conflicto';
 import { Icono } from '@/components/Icono';
 
 interface Props {
@@ -54,10 +55,12 @@ export default function ProveedorForm({ open, onClose, proveedor }: Props) {
   async function onSubmit(values: ProveedorFormValues) {
     try {
       const { contactos, ...data } = values;
-      await saveProveedor.mutateAsync({ id: proveedor?.id ?? null, data, contactos });
+      await saveProveedor.mutateAsync({ id: proveedor?.id ?? null, data, contactos, version: proveedor ? proveedor.updated_at : undefined });
       toast(proveedor ? 'Proveedor actualizado' : 'Proveedor agregado', 'success');
       onClose();
     } catch (e) {
+      // Si alguien lo cambió mientras se editaba, se cierra para volver a abrirlo con lo nuevo (la lista ya se está actualizando).
+      if (e instanceof ConflictoDeEdicion) { toast(mensajeDeError(e), 'error'); onClose(); return; }
       toast('Error al guardar: ' + mensajeDeError(e), 'error');
     }
   }
@@ -117,7 +120,7 @@ export default function ProveedorForm({ open, onClose, proveedor }: Props) {
           {fields.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>Sin contactos aún. Hacé clic en "Agregar contacto".</p>}
           {fields.map((f, i) => (
             <div className="contact-row" key={f.id}>
-              <button type="button" className="btn-remove-contact" onClick={() => remove(i)}><Icono n="cerrar" /></button>
+              <button type="button" className="btn-remove-contact" aria-label="Quitar contacto" title="Quitar contacto" onClick={() => remove(i)}><Icono n="cerrar" /></button>
               <div className="contact-row-grid">
                 <div className="form-group">
                   <label htmlFor={`contacto-${f.id}-nombre`}>Nombre y apellido *</label>

@@ -14,6 +14,20 @@ export type Database = {
   }
   public: {
     Tables: {
+      avisos_vistos: {
+        Row: { usuario_id: string; clave: string; visto_at: string }
+        Insert: { usuario_id: string; clave: string; visto_at?: string }
+        Update: { usuario_id?: string; clave?: string; visto_at?: string }
+        Relationships: [
+          {
+            foreignKeyName: "avisos_vistos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios_perfil"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ajuste_items: {
         Row: {
           ajuste_id: string
@@ -36,10 +50,17 @@ export type Database = {
           anulado: boolean
           anulado_at: string | null
           anulado_por: string | null
+          clase: string
           created_at: string
+          emisor: Json | null
+          fecha: string
           id: string
           motivo: string
           motivo_anulacion: string | null
+          numero: number
+          observaciones: string | null
+          punto_venta: number
+          referencia: string | null
           usuario_id: string
         }
         Insert: never
@@ -146,9 +167,12 @@ export type Database = {
           zona_horaria: string
           comisionistas_campos_custom: Json | null
           empresa_direccion: string | null
+          empresa_cuit: string | null
           empresa_email: string | null
           empresa_nombre: string | null
+          empresa_razon_social: string | null
           empresa_telefono: string | null
+          empresa_web: string | null
           id: number
           inicial_cerrada_at: string | null
           logo_base64: string | null
@@ -163,9 +187,12 @@ export type Database = {
           zona_horaria?: string
           comisionistas_campos_custom?: Json | null
           empresa_direccion?: string | null
+          empresa_cuit?: string | null
           empresa_email?: string | null
           empresa_nombre?: string | null
+          empresa_razon_social?: string | null
           empresa_telefono?: string | null
+          empresa_web?: string | null
           id?: number
           inicial_cerrada_at?: string | null
           logo_base64?: string | null
@@ -180,9 +207,12 @@ export type Database = {
           zona_horaria?: string
           comisionistas_campos_custom?: Json | null
           empresa_direccion?: string | null
+          empresa_cuit?: string | null
           empresa_email?: string | null
           empresa_nombre?: string | null
+          empresa_razon_social?: string | null
           empresa_telefono?: string | null
+          empresa_web?: string | null
           id?: number
           inicial_cerrada_at?: string | null
           logo_base64?: string | null
@@ -291,6 +321,45 @@ export type Database = {
           nombre?: string
           sector?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      depositos: {
+        Row: {
+          activo: boolean
+          codigo: string
+          color: string | null
+          created_at: string
+          es_principal: boolean
+          icono: string
+          id: string
+          nombre: string
+          prefijo: string
+          punto_venta: number
+        }
+        Insert: {
+          activo?: boolean
+          codigo: string
+          color?: string | null
+          created_at?: string
+          es_principal?: boolean
+          icono?: string
+          id?: string
+          nombre: string
+          prefijo: string
+          punto_venta?: number
+        }
+        Update: {
+          activo?: boolean
+          codigo?: string
+          color?: string | null
+          created_at?: string
+          es_principal?: boolean
+          icono?: string
+          id?: string
+          nombre?: string
+          prefijo?: string
+          punto_venta?: number
         }
         Relationships: []
       }
@@ -426,6 +495,7 @@ export type Database = {
           stock_minimo: number
           subfamilia_id: string
           ubicacion: string | null
+          unidad: string
           updated_at: string
         }
         Insert: {
@@ -458,6 +528,7 @@ export type Database = {
           stock_minimo?: number
           subfamilia_id: string
           ubicacion?: string | null
+          unidad?: string
           updated_at?: string
         }
         Update: {
@@ -490,6 +561,7 @@ export type Database = {
           stock_minimo?: number
           subfamilia_id?: string
           ubicacion?: string | null
+          unidad?: string
           updated_at?: string
         }
         Relationships: [
@@ -542,18 +614,21 @@ export type Database = {
           actualizada_at: string
           componentes: string[]
           id: number
+          max_depositos: number
           modulos: Json
         }
         Insert: {
           actualizada_at?: string
           componentes?: string[]
           id?: number
+          max_depositos?: number
           modulos?: Json
         }
         Update: {
           actualizada_at?: string
           componentes?: string[]
           id?: number
+          max_depositos?: number
           modulos?: Json
         }
         Relationships: []
@@ -1352,6 +1427,7 @@ export type Database = {
           mantenimiento_rol: string | null
           nombre: string | null
           puede_ajustar_inventario: boolean
+          puede_gestionar_depositos: boolean
           puede_resetear_contrasenas: boolean
           puede_ver_errores: boolean
           puede_ver_retiros: boolean
@@ -1372,6 +1448,7 @@ export type Database = {
           mantenimiento_rol?: string | null
           nombre?: string | null
           puede_ajustar_inventario?: boolean
+          puede_gestionar_depositos?: boolean
           puede_resetear_contrasenas?: boolean
           puede_ver_errores?: boolean
           puede_ver_retiros?: boolean
@@ -1392,6 +1469,7 @@ export type Database = {
           mantenimiento_rol?: string | null
           nombre?: string | null
           puede_ajustar_inventario?: boolean
+          puede_gestionar_depositos?: boolean
           puede_resetear_contrasenas?: boolean
           puede_ver_errores?: boolean
           puede_ver_retiros?: boolean
@@ -1406,6 +1484,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      marcar_aviso_visto: { Args: { p_clave: string }; Returns: string }
       _aud_actor: { Args: never; Returns: Record<string, unknown> }
       _aud_cambio: {
         Args: { anterior: string; etiqueta: string; nuevo: string }
@@ -1418,6 +1497,47 @@ export type Database = {
       can_view_sugerencias: { Args: never; Returns: boolean }
       cancel_task: { Args: { p_task_id: string }; Returns: undefined }
       complete_task: { Args: { p_task_id: string }; Returns: undefined }
+      confirmar_retiro: {
+        Args: { p_lineas: Json; p_observacion: string; p_sector_id: string }
+        Returns: string
+      }
+      crear_deposito: {
+        Args: {
+          p_color?: string | null
+          p_icono?: string
+          p_nombre: string
+          p_prefijo: string
+        }
+        Returns: Database['public']['Tables']['depositos']['Row']
+      }
+      can_gestionar_depositos: { Args: never; Returns: boolean }
+      depositos_del_usuario: { Args: never; Returns: string[] }
+      editar_deposito: {
+        Args: {
+          p_activo: boolean
+          p_color: string | null
+          p_icono: string
+          p_id: string
+          p_nombre: string
+          p_prefijo?: string | null
+        }
+        Returns: Database['public']['Tables']['depositos']['Row']
+      }
+      crear_repuesto: {
+        Args: {
+          p_descripcion: string
+          p_detalles: string
+          p_familia_id: string
+          p_numero: string
+          p_punto_pedido: number
+          p_stock: number
+          p_stock_minimo: number
+          p_subfamilia_id: string
+          p_ubicacion: string
+          p_unidad: string
+        }
+        Returns: Database['public']['Tables']['items']['Row']
+      }
       crear_reparacion: {
         Args: {
           p_envio_id: string
@@ -1459,17 +1579,92 @@ export type Database = {
       }
       anular_ajuste_inventario: { Args: { p_ajuste_id: string; p_motivo: string }; Returns: undefined }
       can_ajustar_inventario: { Args: never; Returns: boolean }
+      aplicar_importacion_stock: { Args: { p_filas: Json }; Returns: Json }
+      // (la base devuelve { documentos: [ids], lineas: n })
+      comprobante_texto: { Args: { p_clase: string; p_numero: number; p_punto_venta: number }; Returns: string }
       crear_ajuste_inventario: { Args: { p_lineas: Json; p_motivo: string }; Returns: string }
+      crear_movimiento_stock: {
+        Args: { p_clase: string; p_fecha: string; p_lineas: Json; p_motivo: string; p_observaciones: string; p_referencia: string }
+        Returns: Json
+      }
+      repuestos_a_reponer: {
+        Args: { p_texto?: string; p_familia_id?: string; p_estado?: string; p_limite?: number }
+        Returns: {
+          id: string
+          codigo: string
+          numero: string
+          descripcion: string
+          detalles: string | null
+          stock: number | null
+          stock_minimo: number
+          punto_pedido: number
+          familia_id: string
+          subfamilia_id: string
+          estado_reposicion: string | null
+          total: number
+          total_sin_stock: number
+        }[]
+      }
+      historial_de_retiros: {
+        Args: { p_texto?: string; p_desde?: string; p_hasta?: string; p_usuario?: string; p_antes_en?: string; p_antes_id?: string; p_limite?: number }
+        Returns: { id: string; usuario_id: string; created_at: string; observacion_general: string | null; sector: string | null; lineas: Json }[]
+      }
+      lista_de_movimientos: {
+        Args: { p_texto?: string; p_filtro?: string; p_desde?: string; p_hasta?: string; p_antes_en?: string; p_antes_id?: string; p_limite?: number }
+        Returns: {
+          id: string; created_at: string; usuario_id: string; clase: string; fecha: string; punto_venta: number; numero: number; referencia: string | null
+          observaciones: string | null; motivo: string; anulado: boolean; anulado_por: string | null; anulado_at: string | null; motivo_anulacion: string | null; lineas: Json
+        }[]
+      }
+      buscar_repuestos: {
+        Args: { p_texto: string; p_limite?: number; p_familia_id?: string; p_subfamilia_id?: string }
+        Returns: {
+          id: string
+          codigo: string
+          numero: string
+          descripcion: string
+          detalles: string | null
+          ubicacion: string | null
+          stock: number | null
+          stock_minimo: number
+          punto_pedido: number
+          familia_id: string
+          subfamilia_id: string
+          foto_url: string | null
+          puntaje: number
+        }[]
+      }
+      ficha_de_stock: {
+        Args: { p_antes?: number; p_item_id: string; p_limite?: number }
+        Returns: {
+          comprobante: string | null
+          created_at: string
+          detalle: string
+          entrada: number
+          existencia: number | null
+          id: number
+          motivo: string | null
+          referencia: string | null
+          salida: number
+          sector: string | null
+          tipo: string
+          usuario_id: string | null
+        }[]
+      }
       historial_ajustes_por_item: {
         Args: { p_item_id: string }
         Returns: {
           anulado: boolean
           anulado_at: string | null
           cantidad: number
+          clase: string
           created_at: string
           id: string
           motivo: string
           motivo_anulacion: string | null
+          numero: number
+          punto_venta: number
+          referencia: string | null
           stock_antes: number | null
           stock_despues: number | null
           tipo: string

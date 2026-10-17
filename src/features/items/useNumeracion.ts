@@ -3,6 +3,9 @@ import { supabase } from '../../lib/supabaseClient';
 import type { Item } from './useItems';
 import { analizarNumeros, type AnalisisDeNumeros } from '../../lib/numeracion';
 
+// Se define afuera para que tenga siempre la misma identidad: así el análisis se calcula una vez por subfamilia y no en cada tecla del formulario.
+const analizar = (items: Item[]): { items: Item[]; analisis: AnalisisDeNumeros } => ({ items, analisis: analizarNumeros(items) });
+
 // Todos los repuestos de UNA subfamilia, también los desactivados (su número sigue ocupado en la base),
 // para sugerir el próximo número y avisar de los que están cargados sin descripción.
 // La clave empieza con 'items': cuando se guarda un repuesto, esta consulta se refresca sola.
@@ -20,6 +23,6 @@ export function useRepuestosDeSubfamilia(familiaId: string, subfamiliaId: string
       if (error) throw error;
       return data as Item[];
     },
-    select: (items): { items: Item[]; analisis: AnalisisDeNumeros } => ({ items, analisis: analizarNumeros(items) }),
+    select: analizar,
   });
 }

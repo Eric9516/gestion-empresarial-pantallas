@@ -155,12 +155,18 @@ export function useAplicarImportacionStock() {
         stock_minimo: f.stock_minimo,
         punto_pedido: f.punto_pedido,
       }));
-      const CHUNK = 500;
+      // El stock no se escribe en los repuestos: la base actualiza sus datos y registra las diferencias de stock como ajustes ("Importación de stock desde Excel"),
+      // en comprobantes de hasta 500 líneas.
+      const CHUNK = 2500;
       for (let i = 0; i < payload.length; i += CHUNK) {
-        const { error } = await supabase.from('items').upsert(payload.slice(i, i + CHUNK), { onConflict: 'codigo' });
+        const { error } = await supabase.rpc('aplicar_importacion_stock', { p_filas: payload.slice(i, i + CHUNK) });
         if (error) throw error;
       }
     },
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['items'] }); },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['items'] });
+      void queryClient.invalidateQueries({ queryKey: ['ajustes'] });
+      void queryClient.invalidateQueries({ queryKey: ['historial-por-item'] });
+    },
   });
 }

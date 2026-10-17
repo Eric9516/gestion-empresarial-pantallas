@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { isDirectorioAdmin, isMantenimientoAdmin, isOwner, puedeResetearContrasenas, puedeVerErrores, puedeVerSugerencias, tieneAccesoAdmin, type Profile } from '../lib/types';
+import { isDirectorioAdmin, isDepositoAdmin, isOwner, puedeGestionarDepositos, puedeResetearContrasenas, puedeVerErrores, puedeVerSugerencias, tieneAccesoAdmin, type Profile } from '../lib/types';
 import UserMenu from '../components/UserMenu';
 import MobileMenu from '../components/MobileMenu';
+import BotonHamburguesa from '../components/BotonHamburguesa';
+import { textoDeAviso, useAvisos } from '../features/avisos/useAvisos';
 import type { ModuloId } from '../lib/modulos';
 import { useConfiguracionQuery } from '../features/config/useConfiguracion';
 import { useModulos } from '../features/config/useModulos';
@@ -14,6 +16,7 @@ import ComisionistasCamposPane from '../features/admin/ComisionistasCamposPane';
 import RepuestosPane from '../features/admin/RepuestosPane';
 import SectoresPanel from '../features/sectores/SectoresPanel';
 import FamiliasPane from '../features/admin/FamiliasPane';
+import DepositosPane from '../features/depositos/DepositosPane';
 import UsuariosPane from '../features/admin/UsuariosPane';
 import HistorialPane from '../features/admin/HistorialPane';
 import ErroresPane from '../features/admin/ErroresPane';
@@ -24,7 +27,7 @@ import ModulosPane from '../features/admin/ModulosPane';
 import { Icono } from '@/components/Icono';
 import type { ReactNode } from 'react';
 
-type Grupo = 'directorio' | 'mantenimiento' | 'general';
+type Grupo = 'directorio' | 'deposito' | 'general';
 
 interface AdminTab {
   id: string;
@@ -46,10 +49,11 @@ const ADMIN_TABS: AdminTab[] = [
   { id: 'empresa', group: 'general', label: <><Icono n="empresa" /> Empresa</>, check: isDirectorioAdmin, Pane: EmpresaPane },
   { id: 'rotulo', group: 'directorio', label: <><Icono n="etiqueta" /> Rótulo</>, check: isDirectorioAdmin, modulo: 'envios', Pane: RotuloDesignPane },
   { id: 'comisionistas', group: 'directorio', label: <><Icono n="acuerdo" /> Comisionistas</>, check: isDirectorioAdmin, modulo: 'comisionistas', Pane: ComisionistasCamposPane },
-  { id: 'repuestos', group: 'mantenimiento', label: <><Icono n="herramienta" /> Repuestos</>, check: isMantenimientoAdmin, modulo: 'deposito', Pane: RepuestosPane },
-  { id: 'sectores', group: 'mantenimiento', label: <><Icono n="fabrica" /> Sectores</>, check: isMantenimientoAdmin, modulo: 'deposito', Pane: SectoresPanel },
-  { id: 'fotos-pendientes', group: 'mantenimiento', label: <><Icono n="camara" /> Fotos pendientes</>, check: isOwner, modulo: 'deposito', Pane: FotosPendientesPane },
-  { id: 'familias', group: 'mantenimiento', label: <><Icono n="etiqueta" /> Familias</>, check: isOwner, modulo: 'deposito', Pane: FamiliasPane },
+  { id: 'repuestos', group: 'deposito', label: <><Icono n="herramienta" /> Repuestos</>, check: isDepositoAdmin, modulo: 'deposito', Pane: RepuestosPane },
+  { id: 'sectores', group: 'deposito', label: <><Icono n="fabrica" /> Sectores</>, check: isDepositoAdmin, modulo: 'deposito', Pane: SectoresPanel },
+  { id: 'fotos-pendientes', group: 'deposito', label: <><Icono n="camara" /> Fotos pendientes</>, check: isOwner, modulo: 'deposito', Pane: FotosPendientesPane },
+  { id: 'familias', group: 'deposito', label: <><Icono n="etiqueta" /> Familias</>, check: isOwner, modulo: 'deposito', Pane: FamiliasPane },
+  { id: 'depositos', group: 'deposito', label: <><Icono n="deposito" /> Depósitos</>, check: puedeGestionarDepositos, modulo: 'deposito', Pane: DepositosPane },
   // Solo el dueño: apaga o prende, dentro de su plan, los módulos que usa (lo que el plan incluye lo define quien vende).
   { id: 'modulos', group: 'general', label: <><Icono n="modulos" /> Módulos</>, check: isOwner, Pane: ModulosPane },
   { id: 'usuarios', group: 'general', label: <><Icono n="usuarios" /> Usuarios</>, check: p => isOwner(p) || puedeResetearContrasenas(p), Pane: UsuariosPane },
@@ -61,7 +65,7 @@ const ADMIN_TABS: AdminTab[] = [
 
 const GRUPOS: { id: Grupo; icon: ReactNode; label: string }[] = [
   { id: 'directorio', icon: <Icono n="tabla" />, label: 'Directorio' },
-  { id: 'mantenimiento', icon: <Icono n="herramienta" />, label: 'Depósito' },
+  { id: 'deposito', icon: <Icono n="herramienta" />, label: 'Depósito' },
   { id: 'general', icon: <Icono n="config" />, label: 'General' },
 ];
 
@@ -70,6 +74,7 @@ function AdminContent() {
   const navigate = useNavigate();
   const { data: config } = useConfiguracionQuery();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { sugerencias: sugerenciasNuevas, total: avisosTotal, marcarVisto } = useAvisos();
 
   const { modulos, listo } = useModulos();
 
@@ -99,6 +104,10 @@ function AdminContent() {
 
   const navItems = [{ icon: <><Icono n="volver" /> </>, label: 'Volver', onClick: () => navigate(-1) }];
 
+  // Al estar mirando las sugerencias, lo que llegue ya está visto.
+  const mirandoSugerencias = tabActual?.id === 'sugerencias';
+  useEffect(() => { if (mirandoSugerencias && sugerenciasNuevas > 0) marcarVisto('sugerencias'); }, [mirandoSugerencias, sugerenciasNuevas, marcarVisto]);
+
   if (!listo) return <div className="loading-screen">Cargando...</div>;
   if (!tabActual) return null;
 
@@ -109,17 +118,13 @@ function AdminContent() {
           {config?.logo_base64 && <img src={config.logo_base64} alt={nombreEmpresa} />}
           <div>
             <div className="header-logo-fallback">{nombreEmpresa}</div>
-            <div className="header-title">Configuración</div>
+            <h1 className="header-title">Configuración</h1>
           </div>
         </div>
         <div className="header-right">
           <button onClick={() => navigate(-1)} className="btn-volver-directorio" style={{ display: 'flex' }}><Icono n="volver" /> <span className="hide-mobile">Volver</span></button>
           <UserMenu />
-          <button className="hamburger-btn" onClick={() => setMenuOpen(true)} aria-label="Menú">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
+          <BotonHamburguesa onClick={() => setMenuOpen(true)} aviso={avisosTotal > 0} />
         </div>
       </header>
 
@@ -128,12 +133,16 @@ function AdminContent() {
           {GRUPOS.filter(g => visibles.some(t => t.group === g.id)).map(g => (
             <button key={g.id} className={`admin-group-tab${grupoActivo === g.id ? ' active' : ''}`} onClick={() => selectGroup(g.id)}>
               {g.icon} <span className="admin-group-tab-label">{g.label}</span>
+              {g.id === 'general' && grupoActivo !== 'general' && sugerenciasNuevas > 0 && <span className="aviso-numero">{textoDeAviso(sugerenciasNuevas)}</span>}
             </button>
           ))}
         </div>
         <div className="admin-subnav">
           {visibles.filter(t => t.group === grupoActivo).map(t => (
-            <button key={t.id} className={`admin-subtab${tabId === t.id ? ' active' : ''}`} onClick={() => setTabId(t.id)}>{t.label}</button>
+            <button key={t.id} className={`admin-subtab${tabId === t.id ? ' active' : ''}`} onClick={() => setTabId(t.id)}>
+              {t.label}
+              {t.id === 'sugerencias' && sugerenciasNuevas > 0 && <span className="aviso-numero">{textoDeAviso(sugerenciasNuevas)}</span>}
+            </button>
           ))}
         </div>
 

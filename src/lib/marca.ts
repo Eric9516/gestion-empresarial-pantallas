@@ -77,5 +77,5 @@ export function aplicarMarca(raiz: Estilable, marca: { primario?: string | null;
   poner(p ? [['--blue', p.base], ['--blue-mid', p.medio], ['--blue-light', p.claro]] : [], ['--blue', '--blue-mid', '--blue-light']);
 
   const d = esColorValido(marca.deposito) ? derivarPaleta(marca.deposito) : null;
-  poner(d ? [['--mant', d.base], ['--mant-mid', d.medio]] : [], ['--mant', '--mant-mid']);
+  poner(d ? [['--deposito', d.base], ['--deposito-mid', d.medio]] : [], ['--deposito', '--deposito-mid']);
 }

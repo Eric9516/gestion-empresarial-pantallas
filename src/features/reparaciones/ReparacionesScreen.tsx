@@ -179,7 +179,7 @@ export default function ReparacionesScreen() {
         <div className="search-wrap">
           <Input type="text" placeholder="Proveedor, artículo, OC, remito..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
         </div>
-        <Select className="filter-select" value={filtro} onChange={e => setFiltro(e.target.value as typeof filtro)}>
+        <Select className="filter-select" aria-label="Mostrar reparaciones" value={filtro} onChange={e => setFiltro(e.target.value as typeof filtro)}>
           <option value="pendientes">Pendientes</option>
           <option value="cerradas">Cerradas</option>
           <option value="todas">Todas</option>

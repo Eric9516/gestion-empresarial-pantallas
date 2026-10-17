@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
@@ -22,10 +22,13 @@ export default function ComentarioRotuloModal({ rotuloId, comentarioActual, pued
   const confirmar = useConfirm();
   const guardar = useGuardarComentarioRotulo();
   const [texto, setTexto] = useState('');
-
-  useEffect(() => {
-    if (rotuloId) setTexto(comentarioActual ?? '');
-  }, [rotuloId, comentarioActual]);
+  // Cuando cambia el envío o su comentario, el cuadro se vuelve a llenar con lo guardado (se ajusta al dibujar, sin efectos).
+  const origen = rotuloId ? `${rotuloId}|${comentarioActual ?? ''}` : null;
+  const [origenCargado, setOrigenCargado] = useState<string | null>(null);
+  if (origen !== origenCargado) {
+    setOrigenCargado(origen);
+    if (origen) setTexto(comentarioActual ?? '');
+  }
 
   if (!rotuloId) return null;
 

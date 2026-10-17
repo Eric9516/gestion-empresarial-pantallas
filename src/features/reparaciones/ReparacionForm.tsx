@@ -3,7 +3,7 @@ import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { registrarErrorAccion } from '../../lib/errorLogging';
 import { fechaHoyISO } from '../../lib/fechaHoy';
-import { prepararBusqueda, puntajeConBusquedaPreparada, useItemsQuery } from '../items/useItems';
+import { useRepuestosParaElegir } from '../items/useItems';
 import { useProveedoresQuery } from '../proveedores/useProveedores';
 import { enviosDelProveedor, enviosLibres, etiquetaDeEnvio } from '../rotulos/etiquetaEnvio';
 import { useDetallesDeEnviosQuery, useRotulosQuery } from '../rotulos/useRotulos';
@@ -25,7 +25,6 @@ interface LineaNueva {
 export default function ReparacionForm({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: proveedores } = useProveedoresQuery();
   const { data: envios } = useRotulosQuery();
-  const { data: items } = useItemsQuery();
   const crear = useCrearReparacion();
   const toast = useToast();
 
@@ -42,11 +41,7 @@ export default function ReparacionForm({ open, onClose }: { open: boolean; onClo
   const enviosLibresDelProv = useMemo(() => enviosLibres(enviosDelProv, asignados), [enviosDelProv, asignados]);
   const { data: detallesDeEnvios } = useDetallesDeEnviosQuery(enviosLibresDelProv.map(e => e.id));
 
-  const resultados = useMemo(() => {
-    if (!busqueda.trim() || !items) return [];
-    const terminos = prepararBusqueda(busqueda);
-    return items.filter(it => puntajeConBusquedaPreparada(it, terminos) > 0).slice(0, 15);
-  }, [items, busqueda]);
+  const resultados = useRepuestosParaElegir(busqueda);
 
   function handleClose() {
     setProveedorId('');

@@ -182,16 +182,16 @@ export default function RotulosScreen() {
         <div className="search-wrap">
           <Input type="text" placeholder="Buscar por N° de remito/despacho..." value={numDoc} onChange={e => setNumDoc(e.target.value)} />
         </div>
-        <Select className="filter-select" value={provFiltro} onChange={e => setProvFiltro(e.target.value)}>
+        <Select className="filter-select" aria-label="Filtrar por proveedor" value={provFiltro} onChange={e => setProvFiltro(e.target.value)}>
           <option value="">Todos los proveedores</option>
           {proveedoresOrdenados.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </Select>
-        <Select className="filter-select" value={comFiltro} onChange={e => setComFiltro(e.target.value)}>
+        <Select className="filter-select" aria-label="Filtrar por comisionista" value={comFiltro} onChange={e => setComFiltro(e.target.value)}>
           <option value="">Todos los comisionistas</option>
           <option value="sin_comisionista">Sin comisionista</option>
           {comisionistasOrdenados.map(c => <option key={c.id} value={c.id}>{c.empresa || c.nombre}</option>)}
         </Select>
-        <Select className="filter-select" style={{ minWidth: 150 }} value={tipoDocFiltro} onChange={e => setTipoDocFiltro(e.target.value)}>
+        <Select className="filter-select" aria-label="Filtrar por tipo de documento" style={{ minWidth: 150 }} value={tipoDocFiltro} onChange={e => setTipoDocFiltro(e.target.value)}>
           <option value="">Remito y despacho</option>
           <option value="remito">Solo remitos</option>
           <option value="despacho">Solo despachos</option>
@@ -199,6 +199,7 @@ export default function RotulosScreen() {
         <div className="filter-date-range" style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1.5px solid var(--border)', borderRadius: 8, background: 'var(--surface2)', padding: '0 8px' }}>
           <Input
             type="date"
+            aria-label="Desde"
             title="Desde"
             value={desde}
             onChange={e => setDesde(e.target.value)}
@@ -207,6 +208,7 @@ export default function RotulosScreen() {
           <span style={{ color: 'var(--text-muted)', fontSize: 12, flexShrink: 0 }}>–</span>
           <Input
             type="date"
+            aria-label="Hasta"
             title="Hasta"
             value={hasta}
             onChange={e => setHasta(e.target.value)}

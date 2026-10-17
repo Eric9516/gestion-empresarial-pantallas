@@ -24,7 +24,8 @@ Ahí están el contexto del producto (**es genérico, para muchas empresas, no s
 Dejá lo decidido por escrito (ver `MODULO-MANTENIMIENTO.md`, sección 5).
 
 ## Lo que SÍ hacés (cuando ya está aprobado)
-- Todo lo nuevo va en `src/features/mantenimiento/` y se engancha desde `src/pages/MantenimientoPage.tsx`.
+- Todo lo nuevo va en `src/features/mantenimiento/`. El módulo tiene **su propia pantalla**, `src/pages/MantenimientoPage.tsx`, que todavía no existe: se crea. El Depósito es otra pantalla (`src/pages/DepositoPage.tsx`) y no se toca.
+- Para enganchar la pantalla nueva: su ruta `/mantenimiento` en `src/App.tsx` (hoy esa dirección lleva al Depósito, por los marcadores viejos: se reemplaza por la pantalla nueva) y su entrada en el menú de áreas, igual que Directorio y Depósito.
 - Parecerte a lo que ya existe: componentes de `src/components/` y `src/components/ui/`, estilos de `src/styles/`, y el estilo de `src/features/reparaciones/` e `src/features/items/`.
 - Íconos: siempre `<Icono n="nombre" />` (`src/components/Icono.tsx`). **Nunca emojis ni símbolos sueltos** (✓, ●, ⋮…): hay una prueba que lo controla. Si falta un ícono, se agrega una línea en ese archivo.
 - Textos en español rioplatense (vos), como el resto de la app. **Pensá primero en el celular.**
@@ -52,5 +53,6 @@ Las tablas que ya existen se piden con el cliente de datos que ya usa la app (mi
 
 ## Datos útiles
 - Idioma de la interfaz: español (Argentina), fechas con `es-AR`.
-- Los módulos de la app se prenden y apagan por cliente. Mantenimiento ya existe como módulo (hoy tiene solo una tabla simple de equipos). Las **reparaciones** (lo que se manda a reparar afuera) **no son de Mantenimiento**: son del Depósito. El módulo nuevo va dentro de Mantenimiento.
+- Los módulos de la app se prenden y apagan por cliente. Mantenimiento ya existe como módulo (hoy tiene solo una tabla simple de equipos).
+- Cuidado con un nombre viejo: en la base, el rol de una persona **sobre el Depósito** se llama `mantenimiento_rol` (y en pantalla `isDepositoAdmin`, `tieneAccesoDeposito`). No es un rol del módulo Mantenimiento: si el módulo necesita roles propios (quién asigna órdenes de trabajo, quién las ejecuta), anotalo en `NOTAS-PARA-ERIC.md`. Las **reparaciones** (lo que se manda a reparar afuera) **no son de Mantenimiento**: son del Depósito. El módulo nuevo va dentro de Mantenimiento.
 - Las pruebas (`pnpm test`) son rápidas y no necesitan internet.

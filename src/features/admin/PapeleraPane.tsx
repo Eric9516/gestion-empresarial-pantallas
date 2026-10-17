@@ -49,7 +49,7 @@ export default function PapeleraPane() {
     return (
       <div className="empty-state">
         <div className="empty-icon"><Icono n="borrar" /></div>
-        <h3>La papelera está vacía</h3>
+        <h2>La papelera está vacía</h2>
         <p>Lo que se elimine de Proveedores, Repuestos, Reparaciones o Envíos va a aparecer acá.</p>
       </div>
     );

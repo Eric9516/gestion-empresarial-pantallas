@@ -70,8 +70,8 @@ describe('aplicarMarca', () => {
     const r = raizFalsa();
     aplicarMarca(r, { primario: '#0a6e4f', deposito: '#7a2a8a' });
     expect(r.puestas.get('--blue')).toBe('#0a6e4f');
-    expect(['--blue-mid', '--blue-light', '--mant', '--mant-mid'].every(n => esColorValido(r.puestas.get(n)))).toBe(true);
-    expect(r.puestas.get('--mant')).toBe('#7a2a8a');
+    expect(['--blue-mid', '--blue-light', '--deposito', '--deposito-mid'].every(n => esColorValido(r.puestas.get(n)))).toBe(true);
+    expect(r.puestas.get('--deposito')).toBe('#7a2a8a');
   });
 
   it('sin color (null o inválido) quita lo que había puesto', () => {
@@ -85,6 +85,6 @@ describe('aplicarMarca', () => {
     const r = raizFalsa();
     aplicarMarca(r, { primario: '#0a6e4f' });
     expect(r.puestas.has('--blue')).toBe(true);
-    expect(r.puestas.has('--mant')).toBe(false);
+    expect(r.puestas.has('--deposito')).toBe(false);
   });
 });

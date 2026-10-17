@@ -1,4 +1,5 @@
 import ResponsiveList, { type Column } from '../../components/ResponsiveList';
+import BotonVerMas from '../../components/BotonVerMas';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
 import { useErrorLogsQuery, useLimpiarErrorLogs, type ErrorLogRow } from './useErrorLogs';
@@ -31,7 +32,7 @@ function renderCard(r: ErrorLogRow) {
 }
 
 export default function ErroresPane() {
-  const { data: rows, isLoading, isError } = useErrorLogsQuery();
+  const { filas: rows, isLoading, isError, hayMas, cargandoMas, verMas } = useErrorLogsQuery();
   const limpiar = useLimpiarErrorLogs();
   const toast = useToast();
   const confirmar = useConfirm();
@@ -58,7 +59,7 @@ export default function ErroresPane() {
         {!isLoading && !isError && (
           <ResponsiveList
             columns={columns}
-            data={rows ?? []}
+            data={rows}
             renderCard={renderCard}
             keyField={r => r.id}
             emptyIcon={<Icono n="error" />}
@@ -66,6 +67,7 @@ export default function ErroresPane() {
             emptyDescription=""
           />
         )}
+        {!isLoading && !isError && <BotonVerMas hayMas={hayMas} cargando={cargandoMas} mostrando={rows.length} onClick={verMas} />}
       </div>
     </div>
   );

@@ -19,12 +19,12 @@ export function isDirectorioDesactivado(profile: Profile | null): boolean {
   return profile?.rol === 'disabled' && !isOwner(profile);
 }
 
-export function isMantenimientoAdmin(profile: Profile | null): boolean {
+export function isDepositoAdmin(profile: Profile | null): boolean {
   return profile?.mantenimiento_rol === 'admin' || isOwner(profile);
 }
 
-export function tieneAccesoMantenimiento(profile: Profile | null): boolean {
-  return profile?.mantenimiento_rol != null || isMantenimientoAdmin(profile);
+export function tieneAccesoDeposito(profile: Profile | null): boolean {
+  return profile?.mantenimiento_rol != null || isDepositoAdmin(profile);
 }
 
 export function puedeVerTodosLosRetiros(profile: Profile | null): boolean {
@@ -45,6 +45,11 @@ export function puedeAjustarInventario(profile: Profile | null): boolean {
   return isOwner(profile) || (profile?.mantenimiento_rol === 'admin' && profile?.puede_ajustar_inventario === true);
 }
 
+// Crear y editar depósitos: los dueños y quien un dueño autorizó. La base lo impone igual; esto solo muestra u oculta la pantalla.
+export function puedeGestionarDepositos(profile: Profile | null): boolean {
+  return isOwner(profile) || profile?.puede_gestionar_depositos === true;
+}
+
 export function puedeVerSugerencias(profile: Profile | null): boolean {
   return profile?.puede_ver_sugerencias === true || isOwner(profile);
 }
@@ -54,5 +59,5 @@ export function puedeVerSugerencias(profile: Profile | null): boolean {
 // puede_resetear_contrasenas se suma acá (no existía en la app vieja) para que
 // alguien con SOLO ese permiso pueda llegar a la pestaña Usuarios.
 export function tieneAccesoAdmin(profile: Profile | null): boolean {
-  return isDirectorioAdmin(profile) || isMantenimientoAdmin(profile) || puedeVerErrores(profile) || puedeResetearContrasenas(profile) || puedeVerSugerencias(profile);
+  return isDirectorioAdmin(profile) || isDepositoAdmin(profile) || puedeVerErrores(profile) || puedeResetearContrasenas(profile) || puedeVerSugerencias(profile) || puedeGestionarDepositos(profile);
 }

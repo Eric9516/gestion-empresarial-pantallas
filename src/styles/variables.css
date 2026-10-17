@@ -7,8 +7,8 @@
   --blue-light: #2d6bc4;
   --red: #c8222a;
   --red-light: #e03038;
-  --mant: #9a5b12;
-  --mant-mid: #c17a1e;
+  --deposito: #9a5b12;
+  --deposito-mid: #c17a1e;
   --white: #ffffff;
   --bg: #f0f4f8;
   --surface: #ffffff;
@@ -16,7 +16,7 @@
   --border: #dde3ec;
   --text: #1a2a3a;
   --text-mid: #4a5568;
-  --text-muted: #8896a8;
+  --text-muted: #5f6e84;
   --success: #1a7a4a;
   --success-bg: #e6f4ec;
   --danger: #c8222a;
@@ -25,6 +25,6 @@
   --shadow-lg: 0 8px 32px color-mix(in srgb, var(--blue) 13%, transparent);
   --radius: 12px;
   --radius-sm: 8px;
-  --font: 'Nunito', sans-serif;
-  --font-display: 'Playfair Display', serif;
+  --font: 'Nunito Variable', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
 }

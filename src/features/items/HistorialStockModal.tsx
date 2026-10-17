@@ -1,55 +1,81 @@
+import { useMemo } from 'react';
 import Modal from '../../components/Modal';
 import { formatoCantidad } from '../../lib/ajustes';
-import { useHistorialPorItem, type HistorialItemFila } from '../retiros/useHistorialPorItem';
+import { useFichaDeStock, type MovimientoFila } from './useFichaDeStock';
+import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 
-const cuando = (ts: string) => new Date(ts).toLocaleString('es-AR');
+const cuando = (ts: string) => new Date(ts).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 
-function Etiqueta({ h }: { h: HistorialItemFila }) {
-  if (h.tipo === 'retiro') return null;
-  const suma = h.tipo === 'ajuste_suma';
-  return (
-    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: 0.3, whiteSpace: 'nowrap', background: suma ? 'var(--success-bg)' : 'var(--danger-bg)', color: suma ? 'var(--success)' : 'var(--danger)' }}>
-      Ajuste ({suma ? 'suma' : 'resta'})
-    </span>
-  );
+// Lo que acompaña al concepto: sector, motivo, referencia y quién lo hizo.
+function aclaracion(m: MovimientoFila): string {
+  return [
+    m.sector ? `Sector: ${m.sector}` : '',
+    m.motivo ? (m.tipo === 'retiro' ? m.motivo : `Motivo: ${m.motivo}`) : '',
+    m.referencia ? `Referencia: ${m.referencia}` : '',
+    m.usuarioNombre !== '—' ? m.usuarioNombre : '',
+  ].filter(Boolean).join(' · ');
 }
 
+// La ficha del repuesto: fecha, documento, concepto, entrada, salida y lo que quedó en stock después de cada movimiento (las más nuevas arriba).
 export default function HistorialStockModal({ item, onClose }: { item: { id: string; codigo: string } | null; onClose: () => void }) {
-  const { data: historial, isLoading } = useHistorialPorItem(item?.id ?? null);
+  const { data, isLoading, isError, hasNextPage, isFetchingNextPage, fetchNextPage } = useFichaDeStock(item?.id ?? null);
+  const filas = useMemo(() => data?.pages.flat() ?? [], [data]);
+
+  // Si ya se vio todo y el movimiento más viejo con saldo no parte de cero, lo anterior no quedó anotado: se muestra como "Saldo anterior".
+  const saldoAnterior = useMemo(() => {
+    if (hasNextPage || !filas.length) return null;
+    const masViejo = filas[filas.length - 1];
+    if (masViejo.existencia === null) return null;
+    const antes = masViejo.existencia - masViejo.entrada + masViejo.salida;
+    return antes > 0 ? antes : null;
+  }, [filas, hasNextPage]);
 
   return (
-    <Modal open={!!item} onClose={onClose} title={<><Icono n="lista" /> Historial de movimientos — {item?.codigo ?? ''}</>}>
+    <Modal open={!!item} onClose={onClose} large title={<><Icono n="lista" /> Historial de movimientos — {item?.codigo ?? ''}</>}>
       {isLoading && <p style={{ color: 'var(--text-muted)' }}>Cargando...</p>}
-      {!isLoading && !historial?.length && (
-        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Todavía no hay movimientos de este repuesto (ni retiros ni ajustes).</p>
+      {isError && <p style={{ color: 'var(--danger)', fontSize: 13 }}>No se pudo cargar el historial.</p>}
+      {!isLoading && !isError && !filas.length && (
+        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Todavía no hay movimientos de este repuesto (ni retiros, ni cargas, ni ajustes).</p>
       )}
-      {!!historial?.length && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
-          {historial.map(h => (
-            <div key={`${h.tipo}-${h.id}`} style={{ padding: '10px 12px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)', fontSize: 13, opacity: h.anulado ? 0.65 : 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontWeight: 700 }}>
-                <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>{h.usuarioNombre} <Etiqueta h={h} /></span>
-                <span style={{ color: 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>{cuando(h.created_at)}</span>
-              </div>
-              {h.tipo === 'retiro' ? (
-                <div style={{ color: 'var(--text-mid)', marginTop: 3 }}>
-                  Cantidad: {h.cantidad}{h.sector ? ` · Sector: ${h.sector}` : ''}
-                </div>
-              ) : (
-                <div style={{ color: 'var(--text-mid)', marginTop: 3 }}>
-                  {h.tipo === 'ajuste_suma' ? 'Suma' : 'Resta'} {formatoCantidad(h.cantidad)} · stock {formatoCantidad(h.stockAntes)} → {formatoCantidad(h.stockDespues)}
-                </div>
-              )}
-              {h.observacion && <div style={{ color: 'var(--text-muted)', marginTop: 3 }}>{h.tipo === 'retiro' ? h.observacion : `Motivo: ${h.observacion}`}</div>}
-              {h.anulado && (
-                <div style={{ color: 'var(--danger)', marginTop: 3, fontWeight: 600 }}>
-                  Anulado{h.anuladoAt ? ` el ${cuando(h.anuladoAt)}` : ''}: {h.motivoAnulacion}. El stock volvió a como estaba.
-                </div>
-              )}
+      {!!filas.length && (
+        <>
+          <div className="table-wrap" style={{ display: 'block', maxHeight: 460, overflowY: 'auto' }}>
+            <table>
+              <thead>
+                <tr><th>Fecha</th><th>Documento</th><th>Concepto</th><th style={{ textAlign: 'right' }}>Entrada</th><th style={{ textAlign: 'right' }}>Salida</th><th style={{ textAlign: 'right' }}>Existencia</th></tr>
+              </thead>
+              <tbody>
+                {filas.map(m => (
+                  <tr key={m.id}>
+                    <td style={{ whiteSpace: 'nowrap' }}>{cuando(m.created_at)}</td>
+                    <td style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{m.comprobante ?? '—'}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{m.detalle}</div>
+                      {aclaracion(m) && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{aclaracion(m)}</div>}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{m.entrada > 0 ? formatoCantidad(m.entrada) : ''}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>{m.salida > 0 ? formatoCantidad(m.salida) : ''}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{m.existencia === null ? '—' : formatoCantidad(m.existencia)}</td>
+                  </tr>
+                ))}
+                {saldoAnterior !== null && (
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <td colSpan={2}>Antes de empezar a llevar la ficha</td>
+                    <td>Saldo anterior</td>
+                    <td /><td />
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatoCantidad(saldoAnterior)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {hasNextPage && (
+            <div style={{ textAlign: 'center', marginTop: 10 }}>
+              <Button variant="ghost" size="sm" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? 'Cargando...' : 'Ver movimientos anteriores'}</Button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </Modal>
   );

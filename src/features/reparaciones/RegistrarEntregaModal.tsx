@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useAuth } from '../../auth/AuthContext';
@@ -30,7 +31,7 @@ export default function RegistrarEntregaModal({ linea, onClose }: Props) {
   const [fechaRemito, setFechaRemito] = useState('');
   const [fechaEntrega, setFechaEntrega] = useState(fechaHoyISO);
 
-  useEffect(() => {
+  useAlCambiar([linea], () => {
     if (linea) {
       setCantidad(String(cantidadPendiente(linea)));
       setResultado('reparado');
@@ -40,7 +41,7 @@ export default function RegistrarEntregaModal({ linea, onClose }: Props) {
       setFechaRemito('');
       setFechaEntrega(fechaHoyISO());
     }
-  }, [linea]);
+  });
 
   async function handleGuardar() {
     if (!linea || !profile) return;

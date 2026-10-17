@@ -3,6 +3,22 @@
 
 export type TipoAjuste = 'suma' | 'resta';
 
+// Un movimiento de stock es una carga (entra mercadería que no es una corrección: solo suma) o un ajuste (corrige el stock: cada artículo suma o resta).
+export type ClaseMovimiento = 'carga' | 'ajuste';
+
+export const NOMBRE_DE_LA_CLASE: Record<ClaseMovimiento, string> = { carga: 'Carga de stock', ajuste: 'Ajuste de inventario' };
+
+// Los motivos más comunes de cada tipo (el último, "Otro", deja escribir uno propio).
+export const MOTIVOS: Record<ClaseMovimiento, string[]> = {
+  carga: ['Devolución de un sector', 'Otro'],
+  ajuste: ['Conteo físico', 'Material retirado sin anotar', 'Rotura', 'Pérdida', 'Vencimiento', 'Otro'],
+};
+
+// "CAR 0001-00000012": tipo, punto de venta (el depósito) y número correlativo, como un remito.
+export function comprobanteTexto(clase: ClaseMovimiento, puntoVenta: number, numero: number | string): string {
+  return `${clase === 'carga' ? 'CAR' : 'AJU'} ${String(puntoVenta).padStart(4, '0')}-${String(numero).padStart(8, '0')}`;
+}
+
 export interface LineaAjuste {
   tipo: TipoAjuste;
   cantidad: number | null; // null = todavía no escribió una cantidad válida
@@ -23,10 +39,10 @@ export function leerCantidad(texto: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Primer problema de la lista, o null si se puede confirmar.
-export function problemaDelAjuste(lineas: LineaAjuste[], motivo: string): string | null {
+// Primer problema de la lista, o null si se puede confirmar. (En una carga el motivo no es obligatorio: si no se escribe, queda "Carga de stock".)
+export function problemaDelMovimiento(clase: ClaseMovimiento, lineas: LineaAjuste[], motivo: string): string | null {
   if (!lineas.length) return 'Agregá al menos un artículo.';
-  if (!motivo.trim()) return 'Indicá el motivo del ajuste.';
+  if (clase === 'ajuste' && !motivo.trim()) return 'Indicá el motivo del ajuste.';
   if (motivo.trim().length > 500) return 'El motivo es demasiado largo (máximo 500 caracteres).';
   if (lineas.some(l => l.cantidad === null)) return 'Hay artículos sin una cantidad válida (mayor que cero).';
   if (lineas.some(l => l.tipo === 'resta' && stockResultante(l.stock, 'resta', l.cantidad as number) < 0)) {
@@ -34,6 +50,8 @@ export function problemaDelAjuste(lineas: LineaAjuste[], motivo: string): string
   }
   return null;
 }
+
+export const problemaDelAjuste = (lineas: LineaAjuste[], motivo: string) => problemaDelMovimiento('ajuste', lineas, motivo);
 
 export function resumenDelAjuste(lineas: Pick<LineaAjuste, 'tipo' | 'cantidad'>[]) {
   let sumas = 0, restas = 0, unidadesSumadas = 0, unidadesRestadas = 0;

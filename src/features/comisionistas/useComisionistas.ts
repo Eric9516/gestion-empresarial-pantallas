@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../auth/AuthContext';
+import { ConflictoDeEdicion } from '../../lib/conflicto';
 import type { Database } from '../../lib/database.types';
 
 export type Comisionista = Database['public']['Tables']['comisionistas']['Row'];
@@ -36,21 +37,27 @@ export function useSaveComisionista() {
   const { profile } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string | null; data: ComisionistaInput }) => {
+    mutationFn: async ({ id, data, version }: { id: string | null; data: ComisionistaInput; version?: string | null }) => {
       const body = {
         ...data,
         modificado_por: profile?.nombre || profile?.email || 'Usuario',
         updated_at: new Date().toISOString(),
       };
       if (id) {
-        const { error } = await supabase.from('comisionistas').update(body).eq('id', id);
+        // Se guarda solo si nadie lo cambió desde que se abrió (version = su "actualizado el"); si no, avisa en vez de pisar lo del otro.
+        let pedido = supabase.from('comisionistas').update(body).eq('id', id);
+        if (version === null) pedido = pedido.is('updated_at', null);
+        else if (version !== undefined) pedido = pedido.eq('updated_at', version);
+        const { data: filas, error } = await pedido.select('id');
         if (error) throw error;
+        if (version !== undefined && !filas?.length) throw new ConflictoDeEdicion('este comisionista');
       } else {
         const { error } = await supabase.from('comisionistas').insert(body);
         if (error) throw error;
       }
     },
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: QUERY_KEY }); },
+    onError: e => { if (e instanceof ConflictoDeEdicion) void queryClient.invalidateQueries({ queryKey: QUERY_KEY }); },
   });
 }
 

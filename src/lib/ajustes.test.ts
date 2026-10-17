@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatoCantidad, leerCantidad, problemaDelAjuste, resumenDelAjuste, stockResultante, type LineaAjuste } from './ajustes';
+import { comprobanteTexto, formatoCantidad, leerCantidad, problemaDelAjuste, problemaDelMovimiento, resumenDelAjuste, stockResultante, type LineaAjuste } from './ajustes';
 
 const linea = (tipo: 'suma' | 'resta', cantidad: number | null, stock: number | null): LineaAjuste => ({ tipo, cantidad, stock });
 
@@ -59,5 +59,28 @@ describe('formatoCantidad', () => {
     expect(formatoCantidad(5)).toBe('5');
     expect(formatoCantidad(2.5)).toBe('2,5');
     expect(formatoCantidad(null)).toBe('—');
+  });
+});
+
+describe('comprobanteTexto', () => {
+  it('arma tipo, punto de venta y número como un remito', () => {
+    expect(comprobanteTexto('carga', 1, 12)).toBe('CAR 0001-00000012');
+    expect(comprobanteTexto('ajuste', 3, 128)).toBe('AJU 0003-00000128');
+    expect(comprobanteTexto('ajuste', 1, '7')).toBe('AJU 0001-00000007');
+  });
+});
+
+describe('problemaDelMovimiento', () => {
+  it('una carga no necesita motivo, un ajuste sí', () => {
+    const una = [linea('suma', 5, 0)];
+    expect(problemaDelMovimiento('carga', una, '')).toBeNull();
+    expect(problemaDelMovimiento('ajuste', una, '')).toMatch(/motivo/i);
+  });
+  it('pide al menos un artículo y cantidades válidas, en los dos tipos', () => {
+    expect(problemaDelMovimiento('carga', [], '')).toMatch(/al menos un artículo/i);
+    expect(problemaDelMovimiento('carga', [linea('suma', null, 0)], '')).toMatch(/cantidad válida/i);
+  });
+  it('un ajuste no puede dejar el stock en negativo', () => {
+    expect(problemaDelMovimiento('ajuste', [linea('resta', 5, 3)], 'conteo')).toMatch(/más de lo que hay/i);
   });
 });
