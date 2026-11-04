@@ -8,3 +8,7 @@ datos-reales/
 .vscode/*
 .idea
 .DS_Store
+
+# Archivos de trabajo de Claude (ejemplos y propuestas con datos reales): no se suben
+Claude outputs/
+.tmp-claude/

@@ -24,6 +24,7 @@ import TareasScreen from '../features/tareas/TareasScreen';
 import ReparacionesScreen from '../features/reparaciones/ReparacionesScreen';
 import AjustesScreen from '../features/ajustes/AjustesScreen';
 import { Icono } from '@/components/Icono';
+import { mantenimientoVisible } from '../features/mantenimiento/visible';
 
 type Tab = 'buscar' | 'carrito' | 'retiros' | 'tareas' | 'reparaciones' | 'informe' | 'ajustes';
 
@@ -72,15 +73,18 @@ function MantenimientoContent() {
     ] },
   ].filter(s => s.items.length > 0);
   // Las áreas a las que puede ir esta persona (si tiene una sola, no hace falta mostrarlas).
-  const areas: SeccionMenu[] = canExit ? [{ titulo: 'Áreas', items: [
-    { clave: 'area-directorio', icono: <Icono n="directorio" />, titulo: 'Directorio', onClick: () => navigate('/') },
+  const verMantenimiento = mantenimientoVisible(modulos);
+  const areas: SeccionMenu[] = canExit || verMantenimiento ? [{ titulo: 'Áreas', items: [
+    ...(canExit ? [{ clave: 'area-directorio', icono: <Icono n="directorio" />, titulo: 'Directorio', onClick: () => navigate('/') }] : []),
     { clave: 'area-deposito', icono: <Icono n={depositoVisible.icono} />, titulo: depositoVisible.nombre, onClick: ir('buscar'), activo: true },
+    ...(verMantenimiento ? [{ clave: 'area-mantenimiento', icono: <Icono n="herramienta" />, titulo: 'Mantenimiento', onClick: () => navigate('/mantenimiento') }] : []),
   ] }] : [];
   const pie = tieneAccesoAdmin(profile) ? [{ clave: 'config', icono: <Icono n="config" />, titulo: 'Configuración', cantidad: sugerenciasNuevas, onClick: () => navigate('/admin') }] : [];
 
   // El menú de la hamburguesa (celular) usa las mismas secciones, en una sola lista.
   const navItems = [
     ...secciones.flatMap(s => s.items).map(i => ({ icon: i.icono, label: i.titulo, cantidad: i.cantidad, onClick: i.onClick, active: i.activo })),
+    ...(verMantenimiento ? [{ icon: <Icono n="herramienta" />, label: 'Mantenimiento', onClick: () => navigate('/mantenimiento') }] : []),
     ...(canExit ? [{ icon: <><Icono n="volver" /> </>, label: 'Volver a Directorio', onClick: () => navigate('/') }] : []),
   ];
 

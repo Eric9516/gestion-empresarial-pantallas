@@ -18,6 +18,7 @@ import ComisionistasList from '../features/comisionistas/ComisionistasList';
 import RotulosScreen from '../features/rotulos/RotulosScreen';
 import TareasScreen from '../features/tareas/TareasScreen';
 import { Icono } from '@/components/Icono';
+import { mantenimientoVisible } from '../features/mantenimiento/visible';
 import type { ReactNode } from 'react';
 
 type Tab = 'proveedores' | 'comisionistas' | 'rotulos' | 'tareas';
@@ -56,6 +57,8 @@ function DirectorioContent() {
   ];
   const tab = pestañas.some(p => p.id === tabElegida) ? tabElegida : pestañas[0]?.id;
   const puedeIrAlDeposito = modulos.deposito && tieneAccesoDeposito(profile);
+  // PARA ERIC: el módulo Mantenimiento todavía no tiene roles propios; hoy usa los permisos del Depósito.
+  const puedeIrAMantenimiento = mantenimientoVisible(modulos) && tieneAccesoDeposito(profile);
 
   if (!listo) return <div className="loading-screen">Cargando...</div>;
   if (!tab) return puedeIrAlDeposito ? <Navigate to="/deposito" replace /> : <SinModulos />;
@@ -66,15 +69,17 @@ function DirectorioContent() {
     { titulo: 'Gestión', items: pestañas.filter(p => p.id === 'tareas').map(itemDe) },
   ].filter(s => s.items.length > 0);
   // Las áreas a las que puede ir esta persona (si tiene una sola, no hace falta mostrarlas).
-  const areas: SeccionMenu[] = puedeIrAlDeposito ? [{ titulo: 'Áreas', items: [
+  const areas: SeccionMenu[] = puedeIrAlDeposito || puedeIrAMantenimiento ? [{ titulo: 'Áreas', items: [
     { clave: 'area-directorio', icono: <Icono n="directorio" />, titulo: 'Directorio', onClick: () => setTabElegida(pestañas[0].id), activo: true },
-    { clave: 'area-deposito', icono: <Icono n={depositoVisible.icono} />, titulo: depositoVisible.nombre, onClick: () => navigate('/deposito') },
+    ...(puedeIrAlDeposito ? [{ clave: 'area-deposito', icono: <Icono n={depositoVisible.icono} />, titulo: depositoVisible.nombre, onClick: () => navigate('/deposito') }] : []),
+    ...(puedeIrAMantenimiento ? [{ clave: 'area-mantenimiento', icono: <Icono n="herramienta" />, titulo: 'Mantenimiento', onClick: () => navigate('/mantenimiento') }] : []),
   ] }] : [];
   const pie = tieneAccesoAdmin(profile) ? [{ clave: 'config', icono: <Icono n="config" />, titulo: 'Configuración', cantidad: sugerenciasNuevas, onClick: () => navigate('/admin') }] : [];
 
   const navItems = [
     ...pestañas.map(p => ({ icon: p.icon, label: p.label, onClick: () => setTabElegida(p.id), active: tab === p.id })),
     ...(puedeIrAlDeposito ? [{ icon: <Icono n={depositoVisible.icono} />, label: depositoVisible.nombre, onClick: () => navigate('/deposito') }] : []),
+    ...(puedeIrAMantenimiento ? [{ icon: <Icono n="herramienta" />, label: 'Mantenimiento', onClick: () => navigate('/mantenimiento') }] : []),
   ];
 
   return (

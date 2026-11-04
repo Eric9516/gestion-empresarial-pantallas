@@ -9,9 +9,11 @@ import AplicarMarca from './components/AplicarMarca';
 // queda en el paquete inicial para que abra rápido).
 const cargarDirectorio = () => import('./pages/DirectorioPage');
 const cargarDeposito = () => import('./pages/DepositoPage');
+const cargarMantenimiento = () => import('./pages/MantenimientoPage');
 const cargarAdmin = () => import('./pages/AdminPage');
 const DirectorioPage = lazy(cargarDirectorio);
 const DepositoPage = lazy(cargarDeposito);
+const MantenimientoPage = lazy(cargarMantenimiento);
 const AdminPage = lazy(cargarAdmin);
 
 // La pantalla que se abrió se empieza a descargar ya, mientras se verifica la sesión (antes se esperaba a saber que había sesión para recién pedir su archivo).
@@ -19,6 +21,7 @@ const AdminPage = lazy(cargarAdmin);
 const RUTA_ABIERTA = window.location.pathname;
 if (RUTA_ABIERTA === '/') void cargarDirectorio();
 else if (RUTA_ABIERTA.startsWith('/deposito')) void cargarDeposito();
+else if (RUTA_ABIERTA.startsWith('/mantenimiento')) void cargarMantenimiento();
 else if (RUTA_ABIERTA.startsWith('/admin')) void cargarAdmin();
 
 export default function App() {
@@ -32,8 +35,9 @@ export default function App() {
         <Route element={<ProtectedLayout />}>
           <Route path="/" element={<DirectorioPage />} />
           <Route path="/deposito" element={<DepositoPage />} />
-          {/* Antes el Depósito vivía en /mantenimiento: los marcadores viejos siguen funcionando. */}
-          <Route path="/mantenimiento" element={<Navigate to="/deposito" replace />} />
+          <Route path="/mantenimiento" element={<MantenimientoPage />} />
+          {/* Dirección que usó el módulo Mantenimiento mientras se armaba. */}
+          <Route path="/equipos" element={<Navigate to="/mantenimiento" replace />} />
           <Route path="/admin" element={<AdminPage />} />
         </Route>
       </Routes>
