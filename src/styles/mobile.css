@@ -97,6 +97,10 @@
   font-weight: 700;
 }
 .mobile-nav-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+/* Sub-menú (por ejemplo, los sub-sectores): con sangría, y una flechita que gira en el ítem que lo despliega. */
+.mobile-nav-item.sub { padding-left: 54px; font-size: 14px; font-weight: 600; }
+.mobile-nav-flecha { display: inline-flex; margin-left: auto; color: var(--text-muted); transition: transform 0.15s; }
+.mobile-nav-flecha.desplegada { transform: rotate(90deg); }
 /* Número rojo al costado de lo que tiene algo nuevo o pendiente. */
 .aviso-numero {
   margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px;

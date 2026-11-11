@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { normalizar } from './buscador';
 import { actualizarDatos, mutacionDemo, nuevoId, useDatosDemo } from './almacenDemo';
-import type { ConsumoStock, DatosMantenimiento, Equipo, Intervencion, Manual, RepuestoCritico } from './tipos';
+import type { ConsumoStock, DatosMantenimiento, Equipo, GastoExterno, Intervencion, Manual, RepuestoCritico } from './tipos';
 
 // Datos de equipos, su historial, repuestos críticos y manuales.
 // HOY: devuelven los datos de ejemplo (almacenDemo.ts). PARA ERIC: reemplazar el interior de
@@ -89,6 +89,7 @@ export function useEliminarEquipo() {
         manuales: d.manuales.filter(x => !ids.has(x.equipoId)),
         rutinas: d.rutinas.filter(x => !ids.has(x.equipoId)),
         ordenes: d.ordenes.filter(x => !ids.has(x.equipoId)),
+        gastosExternos: d.gastosExternos.filter(x => !ids.has(x.equipoId)),
       };
     });
   });
@@ -180,6 +181,31 @@ export function useGuardarRepuestoCritico() {
 export function useQuitarRepuestoCritico() {
   return mutacionDemo((id: string) => {
     actualizarDatos(d => ({ ...d, repuestosCriticos: d.repuestosCriticos.filter(x => x.id !== id) }));
+  });
+}
+
+// ---------- Gastos de servicios externos ----------
+// PARA ERIC: tabla gastos_externos (id, equipo_id, fecha, proveedor, descripcion, monto). Ver NOTAS-PARA-ERIC.md.
+
+export function useGastosExternosQuery() {
+  const d = useDatosDemo();
+  return { data: d.gastosExternos, ...sinCarga };
+}
+
+export type GastoInput = Omit<GastoExterno, 'id'> & { id?: string };
+
+export function useGuardarGastoExterno() {
+  return mutacionDemo((g: GastoInput) => {
+    actualizarDatos(d => {
+      const gasto: GastoExterno = { ...g, id: g.id ?? nuevoId() };
+      return { ...d, gastosExternos: g.id ? d.gastosExternos.map(x => (x.id === g.id ? gasto : x)) : [...d.gastosExternos, gasto] };
+    });
+  });
+}
+
+export function useEliminarGastoExterno() {
+  return mutacionDemo((id: string) => {
+    actualizarDatos(d => ({ ...d, gastosExternos: d.gastosExternos.filter(x => x.id !== id) }));
   });
 }
 

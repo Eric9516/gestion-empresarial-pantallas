@@ -16,8 +16,11 @@ import TecnicosEditor from './TecnicosEditor';
 import DetalleCierre from './DetalleCierre';
 import { nuevoId } from './almacenDemo';
 import {
-  useAnotarValor, useCambiarEstadoOrden, useConfigMantenimiento, useCerrarOrden, useEliminarOrden, useGuardarDetalleCorrectivo, useGuardarRepuestosOrden, useMarcarTareas, useOrdenesQuery, useReprogramarOrden, useRutinasQuery,
+  useAnotarValor, useAprobarOrden, useAsignarOrden, useCambiarEstadoOrden, useConfigMantenimiento, useDerivarOrdenes, useDevolverOrden, useEliminarOrden,
+  useGuardarDetalleCorrectivo, useGuardarRepuestosOrden, useMarcarTareas, useOrdenesQuery, usePasarAAprobacion, useReprogramarOrden, useRutinasQuery, useTerminarOrden,
 } from './usePreventivo';
+import { ahora, devolucion, horaDeAhora, llegaEn, momentoCorto, NOMBRE_ETAPA, yaLlego } from './flujo';
+import { useAhora, useUsuarioMantenimiento } from './usuarioMantenimiento';
 import { useImprimirOrdenes } from './useImprimirOrdenes';
 import EstadoOT from './EstadoOT';
 import { Button } from '@/components/ui/button';
@@ -46,7 +49,14 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
   const marcar = useMarcarTareas();
   const anotar = useAnotarValor();
   const config = useConfigMantenimiento();
-  const cerrar = useCerrarOrden();
+  const terminar = useTerminarOrden();
+  const derivar = useDerivarOrdenes();
+  const asignar = useAsignarOrden();
+  const pasarAAprobacion = usePasarAAprobacion();
+  const devolver = useDevolverOrden();
+  const aprobar = useAprobarOrden();
+  const usuario = useUsuarioMantenimiento();
+  const momento = useAhora();
   const reprogramar = useReprogramarOrden();
   const eliminar = useEliminarOrden();
   const imprimir = useImprimirOrdenes();
@@ -60,8 +70,12 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
   const hoy = fechaHoyISO();
 
   const componentes = useComponentesDeEquipo(ot?.equipoId ?? null);
-  const [modo, setModo] = useState<'ver' | 'terminar' | 'mover' | 'repuestos' | 'falla'>('ver');
-  const [cierre, setCierre] = useState({ fecha: hoy, por: '', horas: '', obs: '', otNueva: true, otValores: true, causa: '', solucion: '', parada: '' });
+  const [modo, setModo] = useState<'ver' | 'terminar' | 'mover' | 'repuestos' | 'falla' | 'asignar' | 'aprobar' | 'devolver'>('ver');
+  const [cierre, setCierre] = useState({ fecha: hoy, horas: '', obs: '', causa: '', solucion: '', parada: '' });
+  const [elegidos, setElegidos] = useState<Set<string>>(new Set());
+  const [comentario, setComentario] = useState('');
+  const [opAprobar, setOpAprobar] = useState({ pendientes: true, valores: true, tareasNuevas: '' });
+  const [verRecorrido, setVerRecorrido] = useState(false);
   const [lineas, setLineas] = useState<RepuestoLinea[]>([]);
   const [tecnicos, setTecnicos] = useState<TrabajoTecnico[]>([]);
   const [liberacion, setLiberacion] = useState<Liberacion | null>(null);
@@ -74,6 +88,13 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
   const valores = ot ? valoresDe(ot) : [];
   const hechas = marcas.filter(Boolean).length;
   const abierta = !!ot && ot.estado !== 'terminada';
+  // Quién puede hacer qué: el técnico asignado completa la OT; el jefe asigna y revisa; el responsable deriva y aprueba.
+  const esAsignado = !!ot && usuario.esTecnico && ot.asignados.includes(usuario.persona.id);
+  const puedeEjecutar = abierta && esAsignado && ot?.etapa === 'asignada';
+  const puedeEditar = abierta && (usuario.esResponsable || usuario.esJefe || esAsignado);
+  const devuelta = ot ? devolucion(ot) : null;
+  // En las correctivas no se tilda OK / NO: el técnico redacta el trabajo realizado y lo pendiente va en observaciones.
+  const esCorrectiva = ot?.tipo === 'correctiva';
 
   function cerrarModal() {
     setModo('ver');
@@ -81,7 +102,7 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
   }
 
   function tildar(i: number) {
-    if (!ot || !abierta) return;
+    if (!ot || !puedeEjecutar) return;
     const nuevas = [...marcas];
     nuevas[i] = !nuevas[i];
     void marcar.mutateAsync({ id: ot.id, tareasHechas: nuevas });
@@ -89,14 +110,14 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
   }
 
   function tildarTodas(valor: boolean) {
-    if (!ot || !abierta) return;
+    if (!ot || !puedeEjecutar) return;
     const nuevas = tareas.map(() => valor);
     void marcar.mutateAsync({ id: ot.id, tareasHechas: nuevas });
     siTodoListo(nuevas);
   }
 
   function anotarValor(i: number, valor: number | null) {
-    if (!ot || !abierta) return;
+    if (!ot || !puedeEjecutar) return;
     void anotar.mutateAsync({ id: ot.id, indice: i, valor });
     if (valor != null) {
       const nuevas = [...marcas];
@@ -107,14 +128,16 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
 
   // Al quedar todas las tareas tildadas, se abre el cierre ya completo: solo falta revisar y confirmar.
   function siTodoListo(nuevas: boolean[]) {
+    if (esCorrectiva) return;
     if (modo === 'ver' && nuevas.length > 0 && nuevas.every(Boolean)) abrirTerminar();
   }
 
   function abrirTerminar() {
-    setCierre({ fecha: hoy, por: ot?.asignadoA ?? '', horas: '', obs: '', otNueva: true, otValores: true, causa: '', solucion: '', parada: '' });
-    // Ya completo: el técnico asignado (con hora de término = ahora), la liberación sin tildar.
-    const fin = horaActual();
-    setTecnicos((ot?.asignadoA ?? '').split(/[,;]/).map(n => n.trim()).filter(Boolean).map(nombre => ({ id: nuevoId(), nombre, fecha: hoy, inicio: '', fin })));
+    setCierre({ fecha: hoy, horas: '', obs: '', causa: '', solucion: '', parada: '' });
+    // Ya completo: quien la termina y los demás técnicos asignados (hora de término = ahora), la liberación sin tildar.
+    const fin = horaDeAhora();
+    const nombres = [usuario.persona.nombre, ...usuario.tecnicos.filter(t => ot?.asignados.includes(t.id) && t.id !== usuario.persona.id).map(t => t.nombre)];
+    setTecnicos(nombres.map(nombre => ({ id: nuevoId(), nombre, fecha: hoy, inicio: '', fin })));
     setLiberacion(liberacionInicial(config));
     setLineas(lineasParaCierre(ot?.repuestos ?? []));
     setModo('terminar');
@@ -157,30 +180,68 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
     if (h != null && (!Number.isFinite(h) || h < 0)) { toast('Las horas tienen que ser un número.', 'error'); return; }
     const hp = cierre.parada.trim() ? Number(cierre.parada.replace(',', '.')) : null;
     if (hp != null && (!Number.isFinite(hp) || hp < 0)) { toast('Las horas de parada tienen que ser un número.', 'error'); return; }
+    if (esCorrectiva && !cierre.solucion.trim()) { toast('Escribí el trabajo realizado.', 'error'); return; }
     const usados = limpiarLineas(lineas);
     try {
-      const nuevas = await cerrar.mutateAsync({
-        id: ot.id,
-        pendientesEnOtNueva: cierre.otNueva,
-        correctivaPorValores: cierre.otValores,
+      const cuando = ahora();
+      await terminar.mutateAsync({
+        id: ot.id, cuando, quien: usuario.persona,
         datos: {
           fechaCierre: cierre.fecha, tareasHechas: marcas, realizadoPor: conNombre.map(t => t.nombre).join(', '), horas: h, tecnicos: conNombre,
           liberacion: liberacion ? { ...liberacion, recibio: liberacion.recibio.trim() } : null, repuestosUsados: '', observaciones: cierre.obs.trim(),
           repuestos: usados,
           correctivo: ot.correctivo ? { causa: cierre.causa.trim(), solucion: cierre.solucion.trim(), horasParada: hp } : undefined,
+          horasParada: ot.correctivo ? undefined : hp,
         },
       });
-      const partes = ['OT terminada y anotada en el historial.'];
-      const descontados = usados.filter(l => (l.usado ?? 0) > 0 && l.codigo).length;
-      if (descontados) partes.push(`Se descontaron del stock ${descontados === 1 ? '1 repuesto' : `${descontados} repuestos`}.`);
+      const llega = llegaEn(cuando, config.horarioRecepcion);
+      const partes = ['OT terminada.', llega === cuando ? 'Le llega al jefe de taller para revisar.' : `Le llega al jefe de taller para revisar el ${momentoCorto(llega)}.`];
       if (rutina) partes.push('Se programó la siguiente.');
-      if (nuevas.pendientes) partes.push(`Lo que faltó quedó en la ${nuevas.pendientes}.`);
-      if (nuevas.valores) partes.push(`Los valores fuera de rango se revisan en la ${nuevas.valores}.`);
       toast(partes.join(' '), 'success');
       setModo('ver');
     } catch (err) {
       toast(mensajeDeError(err), 'error');
     }
+  }
+
+  function abrirAsignar() {
+    if (!ot) return;
+    // De entrada, los que ya tiene; si no tiene, el responsable que figura en la rutina.
+    const sugerido = usuario.tecnicos.filter(t => t.nombre === rutina?.responsable).map(t => t.id);
+    setElegidos(new Set(ot.asignados.length ? ot.asignados : sugerido));
+    setModo('asignar');
+  }
+
+  async function confirmarAsignar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ot) return;
+    try {
+      await asignar.mutateAsync({ id: ot.id, tecnicos: usuario.tecnicos.filter(t => elegidos.has(t.id)), cuando: ahora(), quien: usuario.persona });
+      toast(`${ot.numero} asignada`, 'success');
+      setModo('ver');
+    } catch (err) {
+      toast(mensajeDeError(err), 'error');
+    }
+  }
+
+  async function confirmarDevolver(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ot) return;
+    try {
+      await devolver.mutateAsync({ id: ot.id, cuando: ahora(), quien: usuario.persona, comentario });
+      toast(`${ot.numero} devuelta al técnico`, 'success');
+      setModo('ver');
+    } catch (err) {
+      toast(mensajeDeError(err), 'error');
+    }
+  }
+
+  async function confirmarAprobar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ot) return;
+    const nuevas = await aprobar.mutateAsync({ id: ot.id, opciones: opAprobar, cuando: ahora(), quien: usuario.persona });
+    toast(`${ot.numero} aprobada: ya está en el historial del equipo.${nuevas.length ? ` Se generó la ${nuevas.join(' y la ')} para el jefe de taller.` : ''}`, 'success');
+    setModo('ver');
   }
 
   async function mover(e: React.FormEvent) {
@@ -200,10 +261,11 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
   }
 
   const estado = ot ? estadoAviso(ot, hoy, diasDeAviso(ot, rutinas)) : 'programada';
-  const pendientes = tareas.length - hechas;
+  const pendientes = esCorrectiva ? 0 : tareas.length - hechas;
   const sinValor = tareas.filter((_, i) => mediciones[i] && valores[i] == null).length;
   const fuera = tareas.flatMap((t, i) => (fueraDeRango(mediciones[i], valores[i]) ? [{ t, v: valores[i]!, m: mediciones[i]! }] : []));
   const faltan = ot && abierta ? faltantes(ot.repuestos) : [];
+  const llego = ot ? yaLlego(ot, momento, config.horarioRecepcion) : true;
 
   return (
     <Modal open={!!ot} onClose={cerrarModal} title={<><Icono n="lista" /> {ot?.numero} · OT {ot?.tipo}</>}>
@@ -214,6 +276,33 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
             <span className={`mt-tag ${ot.tipo === 'preventiva' ? 'prev' : 'corr'}`}>{ot.tipo === 'preventiva' ? 'Preventiva' : 'Correctiva'}</span>
             <Button variant="ghost" size="sm" style={{ marginLeft: 'auto' }} onClick={() => void imprimir([ot])}><Icono n="imprimir" /> Imprimir OT</Button>
           </div>
+
+          <div className={`mt-etapa ${ot.etapa}`}>
+            <div>
+              <strong>{NOMBRE_ETAPA[ot.etapa]}</strong>
+              {ot.etapa === 'por_derivar' && ' · la tiene el responsable para mandarla al jefe de taller'}
+              {ot.etapa === 'por_asignar' && ' · la tiene el jefe de taller para asignarla'}
+              {ot.etapa === 'asignada' && ` · ${ot.asignadoA || 'sin técnico'}`}
+              {ot.etapa === 'a_revisar' && ' · la revisa el jefe de taller'}
+              {ot.etapa === 'para_aprobar' && ' · la aprueba el responsable'}
+              {ot.etapa === 'aprobada' && ' · está en el historial del equipo'}
+            </div>
+            {!llego && ot.terminadaEn && <div style={{ fontSize: 12 }}>Terminada el {momentoCorto(ot.terminadaEn)} · llega para revisar el {momentoCorto(llegaEn(ot.terminadaEn, config.horarioRecepcion))}</div>}
+            {ot.pasos.length > 0 && (
+              <button type="button" className="mt-link" style={{ fontSize: 12, alignSelf: 'flex-start' }} onClick={() => setVerRecorrido(v => !v)}>{verRecorrido ? 'Ocultar recorrido' : `Ver recorrido (${ot.pasos.length})`}</button>
+            )}
+            {verRecorrido && (
+              <ul className="mt-recorrido">
+                {ot.pasos.map((p, i) => <li key={i}><span>{momentoCorto(p.cuando)}</span> <strong>{p.quien}</strong> {p.accion.charAt(0).toLowerCase() + p.accion.slice(1)}{p.comentario && <em> — {p.comentario}</em>}</li>)}
+              </ul>
+            )}
+          </div>
+          {devuelta && (
+            <div className="mt-aviso amarillo" style={{ cursor: 'default' }}>
+              <Icono n="volver" />
+              <span style={{ flex: 1 }}>Devuelta por {devuelta.quien}: {devuelta.comentario}</span>
+            </div>
+          )}
 
           <div className="mt-datos" style={{ marginBottom: 14 }}>
             <div style={{ gridColumn: '1 / -1' }}>
@@ -245,13 +334,13 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
             <div className="mt-bloque" style={{ padding: '10px 12px' }}>
               <div className="mt-bloque-titulo">
                 <span><Icono n="alerta" /> Falla reportada</span>
-                {abierta && <button type="button" className="mt-link" style={{ fontSize: 12 }} onClick={abrirFalla}>Cambiar</button>}
+                {puedeEditar && <button type="button" className="mt-link" style={{ fontSize: 12 }} onClick={abrirFalla}>Cambiar</button>}
               </div>
               <div style={{ fontSize: 14 }}>{ot.correctivo.falla || <span style={{ color: 'var(--text-muted)' }}>Sin detalle.</span>}</div>
               {ot.estado === 'terminada' && (
                 <div className="mt-datos" style={{ marginTop: 10 }}>
                   <div style={{ gridColumn: '1 / -1' }}><div className="mt-dato-label">Causa</div><div className="mt-dato-valor">{ot.correctivo.causa || '—'}</div></div>
-                  <div style={{ gridColumn: '1 / -1' }}><div className="mt-dato-label">Solución</div><div className="mt-dato-valor">{ot.correctivo.solucion || '—'}</div></div>
+                  <div style={{ gridColumn: '1 / -1' }}><div className="mt-dato-label">Trabajo realizado</div><div className="mt-dato-valor" style={{ whiteSpace: 'pre-wrap' }}>{ot.correctivo.solucion || '—'}</div></div>
                   <div><div className="mt-dato-label">Horas de parada</div><div className="mt-dato-valor">{ot.correctivo.horasParada ?? '—'}</div></div>
                 </div>
               )}
@@ -280,7 +369,7 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
             <div className="mt-bloque" style={{ padding: '10px 12px' }}>
               <div className="mt-bloque-titulo">
                 <span><Icono n="paquete" /> Repuestos{ot.estado === 'terminada' ? ' usados' : ''}</span>
-                {abierta && <button type="button" className="mt-link" style={{ fontSize: 12 }} onClick={abrirRepuestos}>{ot.repuestos.length ? 'Cambiar' : 'Agregar'}</button>}
+                {puedeEditar && <button type="button" className="mt-link" style={{ fontSize: 12 }} onClick={abrirRepuestos}>{ot.repuestos.length ? 'Cambiar' : 'Agregar'}</button>}
               </div>
               {ot.repuestos.length
                 ? <ListaRepuestos lineas={ot.repuestos} modo={abierta ? 'previsto' : 'usado'} />
@@ -301,11 +390,20 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
             </form>
           )}
 
-          {/* Lista de tareas para tildar */}
+          {/* Correctiva: lo que hay que hacer, sin casilleros (el técnico redacta el trabajo realizado al terminar). */}
+          {esCorrectiva && tareas.length > 0 && (
+            <div className="mt-bloque" style={{ padding: '10px 12px' }}>
+              <div className="mt-bloque-titulo"><span><Icono n="lista" /> Qué hay que hacer</span></div>
+              <ul className="mt-lista-simple">{tareas.map((t, i) => <li key={i}>{t}</li>)}</ul>
+            </div>
+          )}
+
+          {/* Preventiva: lista de tareas para tildar OK */}
+          {!esCorrectiva && (
           <div className="mt-bloque" style={{ padding: '10px 12px' }}>
             <div className="mt-bloque-titulo">
-              <span><Icono n="exito" /> Tareas · {hechas} de {tareas.length} hechas</span>
-              {abierta && tareas.length > 1 && (
+              <span><Icono n="exito" /> Tareas · {hechas} de {tareas.length} OK</span>
+              {puedeEjecutar && tareas.length > 1 && (
                 <span style={{ display: 'flex', gap: 10, fontSize: 12, fontWeight: 700 }}>
                   <button type="button" className="mt-link" onClick={() => tildarTodas(true)}>Marcar todas</button>
                   <button type="button" className="mt-link" onClick={() => tildarTodas(false)}>Desmarcar</button>
@@ -318,22 +416,24 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
             <ul className="mt-checklist">
               {tareas.map((t, i) => (
                 <li key={i}>
-                  <label className={`mt-check${marcas[i] ? ' hecha' : ''}${!abierta ? ' fija' : ''}`}>
-                    <input type="checkbox" checked={marcas[i]} disabled={!abierta} onChange={() => tildar(i)} />
+                  <label className={`mt-check${marcas[i] ? ' hecha' : ''}${!puedeEjecutar ? ' fija' : ''}`}>
+                    <input type="checkbox" checked={marcas[i]} disabled={!puedeEjecutar} onChange={() => tildar(i)} />
                     <span className="mt-check-caja" aria-hidden="true">{marcas[i] ? <Icono n="ok" trazo={3} /> : !abierta ? <Icono n="cerrar" trazo={3} /> : null}</span>
                     <span className="mt-check-texto">{t}</span>
                   </label>
                   {mediciones[i] && (
                     <CampoValor
-                      key={`${ot.id}-${i}-${valores[i] ?? ''}`} medicion={mediciones[i]!} valor={valores[i]} editable={abierta}
+                      key={`${ot.id}-${i}-${valores[i] ?? ''}`} medicion={mediciones[i]!} valor={valores[i]} editable={puedeEjecutar}
                       etiqueta={t} onCambiar={v => anotarValor(i, v)}
                     />
                   )}
                 </li>
               ))}
             </ul>
-            {abierta && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '6px 0 0' }}>Lo que tildás y los valores que anotás se guardan en el momento. Al tildar la última tarea se abre el cierre de la OT, ya completo.</p>}
+            {puedeEjecutar && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '6px 0 0' }}>Lo que tildás y los valores que anotás se guardan en el momento. Al tildar la última tarea se abre el cierre de la OT, ya completo.</p>}
+            {abierta && !puedeEjecutar && <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '6px 0 0' }}>Las tareas las tilda el técnico asignado, desde su usuario.</p>}
           </div>
+          )}
 
           {ot.estado === 'terminada' && (
             <div className="mt-datos" style={{ marginBottom: 14 }}>
@@ -358,22 +458,102 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
             <p style={{ fontSize: 12, color: 'var(--text-mid)', margin: '0 0 12px' }}><Icono n="nota" /> {ot.observaciones}</p>
           )}
 
-          {modo === 'ver' && abierta && (
+          {modo === 'ver' && (
             <div className="mt-acciones">
-              {ot.estado === 'pendiente' && <Button variant="primary" onClick={() => void cambiarEstado.mutateAsync({ id: ot.id, estado: 'en_curso' }).then(() => toast('OT en curso', 'success'))}><Icono n="cohete" /> Empezar</Button>}
-              <Button variant="success" onClick={abrirTerminar}><Icono n="exito" /> Terminar</Button>
-              <Button variant="ghost" onClick={() => { setNuevaFecha(ot.fechaProgramada); setModo('mover'); }}><Icono n="fecha" /> Cambiar fecha</Button>
-              {esAdmin && ot.tipo === 'correctiva' && <Button variant="dangerGhost" onClick={() => void borrar()}><Icono n="borrar" /> Eliminar</Button>}
+              {usuario.esResponsable && ot.etapa === 'por_derivar' && (
+                <Button variant="success" onClick={() => void derivar.mutateAsync({ ids: [ot.id], cuando: ahora(), quien: usuario.persona }).then(() => toast(`${ot.numero} derivada al jefe de taller`, 'success'))}><Icono n="exportar" /> Derivar al jefe de taller</Button>
+              )}
+              {usuario.esJefe && abierta && (ot.etapa === 'por_asignar' || ot.etapa === 'asignada') && (
+                <Button variant={ot.etapa === 'por_asignar' ? 'success' : 'ghost'} onClick={abrirAsignar}><Icono n="usuarios" /> {ot.etapa === 'por_asignar' ? 'Asignar técnicos' : 'Reasignar'}</Button>
+              )}
+              {puedeEjecutar && ot.estado === 'pendiente' && <Button variant="primary" onClick={() => void cambiarEstado.mutateAsync({ id: ot.id, estado: 'en_curso' }).then(() => toast('OT en curso', 'success'))}><Icono n="cohete" /> Empezar</Button>}
+              {puedeEjecutar && <Button variant="success" onClick={abrirTerminar}><Icono n="exito" /> Terminar</Button>}
+              {usuario.esJefe && ot.etapa === 'a_revisar' && llego && (
+                <>
+                  <Button variant="success" onClick={() => void pasarAAprobacion.mutateAsync({ id: ot.id, cuando: ahora(), quien: usuario.persona, comentario: '' }).then(() => toast(`${ot.numero} revisada: le llega al responsable para aprobar`, 'success'))}><Icono n="aprobar" /> Revisada: pasar a aprobación</Button>
+                  <Button variant="ghost" onClick={() => { setComentario(''); setModo('devolver'); }}><Icono n="volver" /> Devolver al técnico</Button>
+                </>
+              )}
+              {usuario.esResponsable && ot.etapa === 'para_aprobar' && llego && (
+                <>
+                  <Button variant="success" onClick={() => { setOpAprobar({ pendientes: true, valores: true, tareasNuevas: '' }); setModo('aprobar'); }}><Icono n="aprobar" /> Aprobar</Button>
+                  <Button variant="ghost" onClick={() => { setComentario(''); setModo('devolver'); }}><Icono n="volver" /> Devolver al técnico</Button>
+                </>
+              )}
+              {abierta && (usuario.esResponsable || usuario.esJefe) && <Button variant="ghost" onClick={() => { setNuevaFecha(ot.fechaProgramada); setModo('mover'); }}><Icono n="fecha" /> Cambiar fecha</Button>}
+              {esAdmin && ot.tipo === 'correctiva' && ot.etapa !== 'aprobada' && <Button variant="dangerGhost" onClick={() => void borrar()}><Icono n="borrar" /> Eliminar</Button>}
             </div>
+          )}
+
+          {modo === 'asignar' && (
+            <form onSubmit={confirmarAsignar} className="mt-bloque">
+              <div className="mt-bloque-titulo"><span><Icono n="usuarios" /> Asignar técnicos</span></div>
+              <div className="mt-liberacion">
+                {usuario.tecnicos.map(t => (
+                  <label key={t.id}>
+                    <input type="checkbox" checked={elegidos.has(t.id)} onChange={e => setElegidos(prev => { const n = new Set(prev); if (e.target.checked) n.add(t.id); else n.delete(t.id); return n; })} />
+                    {t.nombre}
+                  </label>
+                ))}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 0' }}>A cada uno le aparece en "Mis OT". Cada técnico carga sus horas al terminarla.</p>
+              <div className="mt-acciones" style={{ marginTop: 12, marginBottom: 0 }}>
+                <Button type="button" variant="ghost" onClick={() => setModo('ver')}>Volver</Button>
+                <Button type="submit" variant="success"><Icono n="ok" /> Asignar</Button>
+              </div>
+            </form>
+          )}
+
+          {modo === 'devolver' && (
+            <form onSubmit={confirmarDevolver} className="mt-bloque">
+              <div className="mt-bloque-titulo"><span><Icono n="volver" /> Devolver al técnico</span></div>
+              <Textarea value={comentario} onChange={e => setComentario(e.target.value)} rows={3} aria-label="Qué tiene que corregir o completar" placeholder="Qué tiene que corregir o completar" data-autofocus />
+              <div className="mt-acciones" style={{ marginTop: 12, marginBottom: 0 }}>
+                <Button type="button" variant="ghost" onClick={() => setModo('ver')}>Volver</Button>
+                <Button type="submit" variant="primary"><Icono n="volver" /> Devolver</Button>
+              </div>
+            </form>
+          )}
+
+          {modo === 'aprobar' && (
+            <form onSubmit={confirmarAprobar} className="mt-bloque">
+              <div className="mt-bloque-titulo"><span><Icono n="aprobar" /> Aprobar la OT</span></div>
+              <p style={{ fontSize: 13, margin: '0 0 10px' }}>Al aprobarla pasa al historial del equipo y se descuentan del stock los repuestos usados.</p>
+              {pendientes > 0 && (
+                <label className="mt-opcion">
+                  <input type="checkbox" checked={opAprobar.pendientes} onChange={e => setOpAprobar(o => ({ ...o, pendientes: e.target.checked }))} />
+                  Generar una OT con {pendientes === 1 ? 'la tarea que quedó en NO' : `las ${pendientes} tareas que quedaron en NO`} (va al jefe de taller)
+                </label>
+              )}
+              {esCorrectiva && (
+                <div style={{ marginTop: 6 }}>
+                  {ot.observaciones && <p style={{ fontSize: 13, margin: '0 0 6px' }}><strong>Observaciones del técnico:</strong> {ot.observaciones}</p>}
+                  <label htmlFor={`${uid}-tn`} style={{ fontSize: 13, fontWeight: 700 }}>Si quedó algo pendiente, escribí las tareas para una OT nueva (una por renglón; va al jefe de taller)</label>
+                  <Textarea id={`${uid}-tn`} rows={2} value={opAprobar.tareasNuevas} onChange={e => setOpAprobar(o => ({ ...o, tareasNuevas: e.target.value }))} placeholder="Vacío = no se genera ninguna OT" />
+                </div>
+              )}
+              {fuera.length > 0 && (
+                <label className="mt-opcion" style={{ color: 'var(--danger)' }}>
+                  <input type="checkbox" checked={opAprobar.valores} onChange={e => setOpAprobar(o => ({ ...o, valores: e.target.checked }))} />
+                  Generar una OT correctiva para revisar {fuera.length === 1 ? 'el valor fuera de rango' : `los ${fuera.length} valores fuera de rango`}
+                </label>
+              )}
+              <div className="mt-acciones" style={{ marginTop: 12, marginBottom: 0 }}>
+                <Button type="button" variant="ghost" onClick={() => setModo('ver')}>Volver</Button>
+                <Button type="submit" variant="success"><Icono n="aprobar" /> Aprobar</Button>
+              </div>
+            </form>
           )}
 
           {modo === 'terminar' && (
             <form onSubmit={confirmarCierre} className="mt-bloque">
               <div className="mt-bloque-titulo"><span><Icono n="exito" /> Terminar la OT</span></div>
-              <p style={{ fontSize: 13, margin: '0 0 10px', color: pendientes ? '#8a5a00' : 'var(--success)', fontWeight: 700 }}>
-                {pendientes === 0 ? `Se hicieron las ${tareas.length === 1 ? 'tarea' : `${tareas.length} tareas`}.` : `Se hicieron ${hechas} de ${tareas.length} tareas. Quedan ${pendientes} sin hacer.`}
-                {hechas === 0 && tareas.length > 0 && ' (Tildá arriba las que se hicieron.)'}
-              </p>
+              {!esCorrectiva && (
+                <p style={{ fontSize: 13, margin: '0 0 10px', color: pendientes ? '#8a5a00' : 'var(--success)', fontWeight: 700 }}>
+                  {pendientes === 0 ? `${tareas.length === 1 ? 'La tarea quedó OK' : `Las ${tareas.length} tareas quedaron OK`}.` : `${hechas} de ${tareas.length} tareas OK. Quedan ${pendientes} en NO.`}
+                  {hechas === 0 && tareas.length > 0 && ' (Tildá arriba las que quedaron OK.)'}
+                </p>
+              )}
               {mediciones.some(Boolean) && (
                 <div className="mt-valores-cierre">
                   {tareas.map((t, i) => mediciones[i] && (
@@ -401,30 +581,30 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
                     </div>
                   )}
                 </div>
+                <div className="form-group">
+                  <label htmlFor={`${uid}-hp`}>Horas de equipo parado</label>
+                  <Input id={`${uid}-hp`} inputMode="decimal" value={cierre.parada} onChange={e => setCierre(c => ({ ...c, parada: e.target.value }))} placeholder={ot.correctivo ? 'Ej.: 3,5' : 'Vacío si no se paró'} />
+                </div>
                 {ot.correctivo && (
                   <>
-                    <div className="form-group">
-                      <label htmlFor={`${uid}-hp`}>Horas de equipo parado</label>
-                      <Input id={`${uid}-hp`} inputMode="decimal" value={cierre.parada} onChange={e => setCierre(c => ({ ...c, parada: e.target.value }))} placeholder="Ej.: 3,5" />
-                    </div>
                     <div className="form-group full">
                       <label htmlFor={`${uid}-ca`}>Causa de la falla</label>
                       <Textarea id={`${uid}-ca`} rows={2} value={cierre.causa} onChange={e => setCierre(c => ({ ...c, causa: e.target.value }))} placeholder="Por qué pasó. Ej.: falta de lubricación" />
                     </div>
                     <div className="form-group full">
-                      <label htmlFor={`${uid}-so`}>Solución</label>
-                      <Textarea id={`${uid}-so`} rows={2} value={cierre.solucion} onChange={e => setCierre(c => ({ ...c, solucion: e.target.value }))} placeholder="Qué se hizo para arreglarlo" />
+                      <label htmlFor={`${uid}-so`}>Trabajo realizado *</label>
+                      <Textarea id={`${uid}-so`} rows={4} value={cierre.solucion} onChange={e => setCierre(c => ({ ...c, solucion: e.target.value }))} placeholder="Contá qué hiciste para arreglarlo" />
                     </div>
                   </>
                 )}
                 <div className="form-group full">
                   <label>Repuestos que se usaron</label>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Poné 0 en lo que no se cambió: eso no se descuenta del stock. Podés agregar repuestos que no estaban previstos.</div>
-                  <RepuestosEditor lineas={lineas} onChange={setLineas} componentes={componentes} modo="cierre" />
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Poné 0 en lo que no se cambió: eso no se descuenta del stock. Podés agregar repuestos que no estaban previstos. El precio por unidad suma a los costos del equipo.</div>
+                  <RepuestosEditor lineas={lineas} onChange={setLineas} componentes={componentes} modo="cierre" conPrecio />
                 </div>
                 <div className="form-group full">
                   <label htmlFor={`${uid}-o`}>Observaciones</label>
-                  <Textarea id={`${uid}-o`} value={cierre.obs} onChange={e => setCierre(c => ({ ...c, obs: e.target.value }))} placeholder="Qué se encontró, por qué quedó algo sin hacer..." />
+                  <Textarea id={`${uid}-o`} value={cierre.obs} onChange={e => setCierre(c => ({ ...c, obs: e.target.value }))} placeholder={esCorrectiva ? 'Si quedó algo pendiente, anotalo acá' : 'Qué se encontró, por qué quedó algo en NO...'} />
                 </div>
                 {liberacion && (
                   <div className="form-group full">
@@ -444,20 +624,10 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
                     {liberacion.controles.some(c => !c.ok) && <div style={{ fontSize: 12, color: '#8a5a00', fontWeight: 700, marginTop: 4 }}>Quedan controles sin tildar.</div>}
                   </div>
                 )}
-                {fuera.length > 0 && (
-                  <div className="form-group full">
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontWeight: 700, color: 'var(--danger)' }}>
-                      <input type="checkbox" checked={cierre.otValores} onChange={e => setCierre(c => ({ ...c, otValores: e.target.checked }))} style={{ width: 18, height: 18 }} />
-                      Crear una OT correctiva para revisar {fuera.length === 1 ? 'el valor fuera de rango' : `los ${fuera.length} valores fuera de rango`}
-                    </label>
-                  </div>
-                )}
-                {pendientes > 0 && (
-                  <div className="form-group full">
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontWeight: 700 }}>
-                      <input type="checkbox" checked={cierre.otNueva} onChange={e => setCierre(c => ({ ...c, otNueva: e.target.checked }))} style={{ width: 18, height: 18 }} />
-                      Crear una OT nueva con {pendientes === 1 ? 'la tarea que faltó' : `las ${pendientes} tareas que faltaron`}
-                    </label>
+                {(pendientes > 0 || fuera.length > 0) && (
+                  <div className="form-group full" style={{ fontSize: 12, color: 'var(--text-mid)' }}>
+                    {pendientes > 0 && <div>Las tareas en NO pasan a una OT nueva cuando el responsable apruebe esta.</div>}
+                    {fuera.length > 0 && <div>Con los valores fuera de rango se puede generar una OT correctiva al aprobarla.</div>}
                   </div>
                 )}
               </div>
@@ -484,12 +654,6 @@ export default function OrdenDetalleModal({ ordenId, onClose, onVerEquipo, esAdm
       )}
     </Modal>
   );
-}
-
-/** "HH:MM" de ahora (para la hora de término del técnico al abrir el cierre). */
-function horaActual(): string {
-  const ahora = new Date();
-  return `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
 }
 
 /** Casillero para anotar el valor de una medición. Se guarda al salir del campo o con Enter. */

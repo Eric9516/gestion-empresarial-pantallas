@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import { cantidadDeLinea, lineaNueva, type ModoRepuestos } from './repuestos';
 import { useStockRepuestos } from './useStockRepuestos';
 import BuscadorRepuesto from './BuscadorRepuesto';
+import { leerMonto } from './costos';
 import type { RepuestoLinea } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,8 @@ interface Props {
   /** Sugerencias para "Componente" (sub-equipos y partes ya usadas). */
   componentes: string[];
   modo?: ModoRepuestos;
+  /** Pedir también el precio por unidad (al terminar una OT o registrar un mantenimiento: suma a los costos del equipo). */
+  conPrecio?: boolean;
 }
 
 function aNumero(txt: string): number {
@@ -24,13 +27,15 @@ function aNumero(txt: string): number {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
-export default function RepuestosEditor({ lineas, onChange, componentes, modo = 'previsto' }: Props) {
+export default function RepuestosEditor({ lineas, onChange, componentes, modo = 'previsto', conPrecio = false }: Props) {
   const uid = useId();
   // El stock se pide también para los códigos que todavía no se guardaron.
   const codigos = useMemo(() => lineas.map(l => l.codigo).filter(Boolean), [lineas]);
   const { stockDeLinea } = useStockRepuestos(codigos);
   // Renglones que se están escribiendo a mano (código y descripción libres).
   const [aMano, setAMano] = useState<Set<string>>(() => new Set());
+  // Lo que se va escribiendo en cada precio (para no borrar la coma o el punto mientras se escribe).
+  const [precios, setPrecios] = useState<Record<string, string>>({});
   // Si el mismo repuesto está en varios renglones, el stock tiene que alcanzar para todos juntos.
   const totalPorCodigo = useMemo(() => {
     const m = new Map<string, number>();
@@ -78,6 +83,20 @@ export default function RepuestosEditor({ lineas, onChange, componentes, modo = 
                   onChange={e => cambiar(l.id, modo === 'cierre' ? { usado: aNumero(e.target.value) } : { cantidad: aNumero(e.target.value) })}
                 />
               </div>
+              {conPrecio && (
+                <div className="mt-rep-campo" style={{ flex: 1, minWidth: 110 }}>
+                  <label htmlFor={`${uid}-p${i}`}>Precio x unidad $</label>
+                  <Input
+                    id={`${uid}-p${i}`} inputMode="decimal" placeholder="Opcional"
+                    value={precios[l.id] ?? (l.precio != null ? String(l.precio).replace('.', ',') : '')}
+                    onChange={e => {
+                      const txt = e.target.value;
+                      setPrecios(p => ({ ...p, [l.id]: txt }));
+                      cambiar(l.id, { precio: leerMonto(txt) });
+                    }}
+                  />
+                </div>
+              )}
               <Button type="button" variant="ghost" size="icon" aria-label="Quitar repuesto" onClick={() => quitar(l.id)} style={{ alignSelf: 'flex-end' }}><Icono n="borrar" /></Button>
             </div>
             {!manual && l.codigo ? (

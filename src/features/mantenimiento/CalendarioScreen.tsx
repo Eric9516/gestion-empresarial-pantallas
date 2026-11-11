@@ -7,9 +7,14 @@ import { useEquiposQuery, usePersonasSugeridas } from './useEquipos';
 import { useOrdenesQuery, useRutinasQuery } from './usePreventivo';
 import OrdenDetalleModal from './OrdenDetalleModal';
 import OrdenCorrectivaForm from './OrdenCorrectivaForm';
+import { useUsuarioMantenimiento } from './usuarioMantenimiento';
 import RutinaForm from './RutinaForm';
 import PlanillasModal from './PlanillasModal';
 import EstadoOT from './EstadoOT';
+import Modal from '../../components/Modal';
+import { ahora, colorDe, NOMBRE_ETAPA } from './flujo';
+import { useDerivarOrdenes } from './usePreventivo';
+import { useToast } from '../../components/ToastProvider';
 import type { FechaISO, OrdenTrabajo, RutinaPreventiva } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
@@ -38,8 +43,15 @@ export default function CalendarioScreen({ esAdmin, onVerEquipo }: Props) {
   const [otAbierta, setOtAbierta] = useState<string | null>(null);
   const [rutinaForm, setRutinaForm] = useState<RutinaPreventiva | 'nueva' | null>(null);
   const [correctivaOpen, setCorrectivaOpen] = useState(false);
+  const usuario = useUsuarioMantenimiento();
   const [planillasOpen, setPlanillasOpen] = useState(false);
   const imprimir = useImprimirOrdenes();
+  const derivar = useDerivarOrdenes();
+  const toast = useToast();
+  // Ventana con todo lo de un día (se abre al tocar un día que tiene algo).
+  const [diaAbierto, setDiaAbierto] = useState(false);
+  // Si la OT se abrió desde la ventana del día, al cerrarla se vuelve a esa ventana.
+  const [volverAlDia, setVolverAlDia] = useState(false);
 
   const equipoPorId = useMemo(() => new Map(equipos.map(e => [e.id, e])), [equipos]);
   const codigo = (id: string) => equipoPorId.get(id)?.codigo ?? '?';
@@ -84,13 +96,69 @@ export default function CalendarioScreen({ esAdmin, onVerEquipo }: Props) {
 
   const delDia = porDia.get(elegido) ?? [];
   const delDiaOts = delDia.flatMap(e => (e.clase === 'futura' ? [] : [e.ot]));
+  const paraDerivar = usuario.esResponsable ? delDiaOts.filter(o => o.etapa === 'por_derivar') : [];
+
+  function tocarDia(f: FechaISO) {
+    setElegido(f);
+    if ((porDia.get(f) ?? []).length) setDiaAbierto(true);
+  }
+
+  function abrirOT(id: string, desdeDia: boolean) {
+    if (desdeDia) { setDiaAbierto(false); setVolverAlDia(true); }
+    setOtAbierta(id);
+  }
+
+  function cerrarOT() {
+    setOtAbierta(null);
+    if (volverAlDia) { setVolverAlDia(false); setDiaAbierto(true); }
+  }
+
+  async function derivarDelDia() {
+    const ids = paraDerivar.map(o => o.id);
+    await derivar.mutateAsync({ ids, cuando: ahora(), quien: usuario.persona });
+    toast(ids.length === 1 ? 'OT derivada al jefe de taller' : `${ids.length} OT derivadas al jefe de taller`, 'success');
+  }
+
+  const botonesDelDia = (
+    <>
+      {paraDerivar.length > 0 && <Button variant="success" size="sm" onClick={() => void derivarDelDia()}><Icono n="exportar" /> Derivar {paraDerivar.length === 1 ? 'la OT' : `las ${paraDerivar.length}`} al jefe</Button>}
+      {delDiaOts.length > 0 && <Button variant="ghost" size="sm" onClick={() => void imprimir(delDiaOts)}><Icono n="imprimir" /> Imprimir {delDiaOts.length === 1 ? 'la OT' : `las ${delDiaOts.length} OT`} del día</Button>}
+    </>
+  );
+
+  const filasDelDia = (desdeDia: boolean) => delDia.map((e, i) => e.clase === 'futura' ? (
+    <div key={i} className="mt-fila">
+      <div className="mt-fila-cuerpo">
+        <div className="mt-tags" style={{ marginBottom: 3 }}><span className="mt-tag">Más adelante</span></div>
+        <div className="mt-fila-titulo" style={{ fontSize: 13 }}>{e.texto}</div>
+        <div className="mt-fila-sub">La OT se genera cuando se termine la anterior de esta rutina ({frecuenciaEnPalabras(e.rutina.frecuenciaDias)}).</div>
+      </div>
+    </div>
+  ) : (
+    <div key={i} className={`mt-fila mt-fila-color ${colorDe(e.ot, hoy, usuario.persona.rol)}`} style={{ cursor: 'pointer' }} onClick={() => abrirOT(e.ot.id, desdeDia)}>
+      <div className="mt-fila-cuerpo">
+        <div className="mt-tags" style={{ marginBottom: 3 }}>
+          <strong style={{ fontSize: 13 }}>{e.ot.numero}</strong>
+          <EstadoOT ot={e.ot} estado={e.clase} />
+          <span className={`mt-tag ${e.ot.tipo === 'preventiva' ? 'prev' : 'corr'}`}>{e.ot.tipo === 'preventiva' ? 'Preventiva' : 'Correctiva'}</span>
+          <span className="mt-tag">{NOMBRE_ETAPA[e.ot.etapa]}</span>
+        </div>
+        <div className="mt-fila-titulo" style={{ fontSize: 13 }}>{codigo(e.ot.equipoId)} — {equipoPorId.get(e.ot.equipoId)?.nombre}</div>
+        <div className="mt-fila-sub">{[resumenTareas(e.ot.tareas) || e.ot.correctivo?.falla, avanceTareas(e.ot), e.ot.asignadoA].filter(Boolean).join(' · ')}</div>
+      </div>
+      <Button variant="primary" size="sm" style={{ flexShrink: 0 }} onClick={ev => { ev.stopPropagation(); abrirOT(e.ot.id, desdeDia); }}>Ver OT</Button>
+    </div>
+  ));
+
+  const fechaLarga = aFecha(elegido).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const tituloDia = fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1);
 
   return (
     <div>
       <div className="section-header">
         <div className="section-title"><Icono n="calendario" /> Calendario preventivo</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Button variant="ghost" size="sm" onClick={() => setCorrectivaOpen(true)}><Icono n="herramienta" /> OT correctiva</Button>
+          {usuario.esTecnico && <Button variant="ghost" size="sm" onClick={() => setCorrectivaOpen(true)}><Icono n="herramienta" /> Cargar OT correctiva</Button>}
           <Button variant="ghost" size="sm" onClick={() => setPlanillasOpen(true)}><Icono n="lista" /> Planillas de tareas</Button>
           {esAdmin && <Button variant="primary" size="sm" onClick={() => setRutinaForm('nueva')}><Icono n="mas" /> Nueva rutina</Button>}
         </div>
@@ -136,7 +204,7 @@ export default function CalendarioScreen({ esAdmin, onVerEquipo }: Props) {
                     key={f}
                     type="button"
                     className={`mt-cal-dia${otroMes ? ' otro-mes' : ''}${f === hoy ? ' hoy' : ''}${f === elegido ? ' elegido' : ''}`}
-                    onClick={() => setElegido(f)}
+                    onClick={() => tocarDia(f)}
                     aria-label={`${formatearFechaSola(f)}: ${entradas.length} ${entradas.length === 1 ? 'tarea' : 'tareas'}`}
                   >
                     <span className="mt-cal-num">{aFecha(f).getDate()}</span>
@@ -159,31 +227,10 @@ export default function CalendarioScreen({ esAdmin, onVerEquipo }: Props) {
           <div className="mt-bloque">
             <div className="mt-bloque-titulo">
               <span><Icono n="fecha" /> {formatearFechaSola(elegido)}{elegido === hoy && ' (hoy)'}</span>
-              {delDiaOts.length > 0 && <Button variant="ghost" size="sm" onClick={() => void imprimir(delDiaOts)}><Icono n="imprimir" /> Imprimir {delDiaOts.length === 1 ? 'la OT' : `las ${delDiaOts.length} OT`} del día</Button>}
+              <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{botonesDelDia}</span>
             </div>
             {!delDia.length && <div className="mt-vacio">Nada para este día.</div>}
-            {delDia.map((e, i) => e.clase === 'futura' ? (
-              <div key={i} className="mt-fila">
-                <div className="mt-fila-cuerpo">
-                  <div className="mt-tags" style={{ marginBottom: 3 }}><span className="mt-tag">Más adelante</span></div>
-                  <div className="mt-fila-titulo" style={{ fontSize: 13 }}>{e.texto}</div>
-                  <div className="mt-fila-sub">La OT se genera cuando se termine la anterior de esta rutina ({frecuenciaEnPalabras(e.rutina.frecuenciaDias)}).</div>
-                </div>
-              </div>
-            ) : (
-              <div key={i} className="mt-fila" style={{ cursor: 'pointer' }} onClick={() => setOtAbierta(e.ot.id)}>
-                <div className="mt-fila-cuerpo">
-                  <div className="mt-tags" style={{ marginBottom: 3 }}>
-                    <strong style={{ fontSize: 13 }}>{e.ot.numero}</strong>
-                    <EstadoOT ot={e.ot} estado={e.clase} />
-                    <span className={`mt-tag ${e.ot.tipo === 'preventiva' ? 'prev' : 'corr'}`}>{e.ot.tipo === 'preventiva' ? 'Preventiva' : 'Correctiva'}</span>
-                  </div>
-                  <div className="mt-fila-titulo" style={{ fontSize: 13 }}>{codigo(e.ot.equipoId)} — {equipoPorId.get(e.ot.equipoId)?.nombre}</div>
-                  <div className="mt-fila-sub">{resumenTareas(e.ot.tareas)}{avanceTareas(e.ot) && ` · ${avanceTareas(e.ot)}`}{e.ot.asignadoA && ` · ${e.ot.asignadoA}`}</div>
-                </div>
-                <Button variant="primary" size="sm" onClick={ev => { ev.stopPropagation(); setOtAbierta(e.ot.id); }}>Ver OT</Button>
-              </div>
-            ))}
+            {filasDelDia(false)}
           </div>
         </div>
 
@@ -209,10 +256,24 @@ export default function CalendarioScreen({ esAdmin, onVerEquipo }: Props) {
         </div>
       </div>
 
-      <OrdenDetalleModal ordenId={otAbierta} onClose={() => setOtAbierta(null)} onVerEquipo={onVerEquipo} esAdmin={esAdmin} personas={personas} />
+      <Modal
+        open={diaAbierto}
+        onClose={() => setDiaAbierto(false)}
+        large
+        title={<><Icono n="calendario" /> {tituloDia}{elegido === hoy && ' (hoy)'}</>}
+      >
+        <p style={{ fontSize: 13, color: 'var(--text-mid)', margin: '0 0 10px' }}>
+          {delDiaOts.length === 1 ? '1 OT' : `${delDiaOts.length} OT`}
+          {delDia.length > delDiaOts.length && ` · ${delDia.length - delDiaOts.length} más adelante (todavía sin OT)`}
+        </p>
+        {(paraDerivar.length > 0 || delDiaOts.length > 0) && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>{botonesDelDia}</div>}
+        {filasDelDia(true)}
+      </Modal>
+
+      <OrdenDetalleModal ordenId={otAbierta} onClose={cerrarOT} onVerEquipo={onVerEquipo} esAdmin={esAdmin} personas={personas} />
       <PlanillasModal open={planillasOpen} onClose={() => setPlanillasOpen(false)} esAdmin={esAdmin} />
       <RutinaForm open={!!rutinaForm} onClose={() => setRutinaForm(null)} rutina={rutinaForm === 'nueva' ? null : rutinaForm} personas={personas} />
-      <OrdenCorrectivaForm open={correctivaOpen} onClose={() => setCorrectivaOpen(false)} personas={personas} />
+      <OrdenCorrectivaForm open={correctivaOpen} onClose={() => setCorrectivaOpen(false)} />
     </div>
   );
 }

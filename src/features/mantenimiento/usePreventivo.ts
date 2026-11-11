@@ -1,7 +1,9 @@
 import { actualizarDatos, mutacionDemo, nuevoId, obtenerDatos, useDatosDemo } from './almacenDemo';
-import { sumarDias } from './fechas';
-import { cerrarOrden, medicionesDe, numeroCorto, numeroOT, textoRango, ultimoNumeroOT, type DatosCierre } from './preventivo';
-import type { ConfigMantenimiento, DetalleCorrectivo, EstadoOT, OrdenTrabajo, PlanillaTareas, Prioridad, RepuestoLinea, RutinaPreventiva } from './tipos';
+import { paso } from './flujo';
+import {
+  aprobarOrden, armarCorrectivaCargada, numeroOT, terminarOrden, ultimoNumeroOT, type CorrectivaCargada, type DatosCierre, type OpcionesAprobacion,
+} from './preventivo';
+import type { ConfigMantenimiento, DetalleCorrectivo, EstadoOT, OrdenTrabajo, PersonaMantenimiento, PlanillaTareas, RepuestoLinea, RutinaPreventiva } from './tipos';
 
 // Rutinas preventivas y órdenes de trabajo (OT).
 // HOY: datos de ejemplo (almacenDemo.ts), que además genera solo la OT de cada rutina.
@@ -38,20 +40,115 @@ export function useEliminarRutina() {
   });
 }
 
-/** Una OT correctiva a mano (algo que se rompió o hay que hacer una sola vez). */
-export function useCrearOrdenCorrectiva() {
-  return mutacionDemo((o: Pick<OrdenTrabajo, 'equipoId' | 'fechaProgramada' | 'tareas' | 'asignadoA' | 'repuestos'> & { prioridad: Prioridad; falla: string }): string => {
+/**
+ * El técnico carga una OT correctiva hecha de urgencia (llamado de guardia), con el trabajo ya hecho.
+ * Queda "para revisar": la revisa el jefe de taller y la aprueba el responsable. Devuelve su número.
+ */
+export function useCargarCorrectiva() {
+  return mutacionDemo(({ datos, cuando, quien }: { datos: CorrectivaCargada; cuando: string; quien: PersonaMantenimiento }): string => {
     const numero = numeroOT(ultimoNumeroOT(obtenerDatos().ordenes) + 1);
+    actualizarDatos(d => ({ ...d, ordenes: [...d.ordenes, armarCorrectivaCargada(datos, nuevoId(), numero, cuando, quien)] }));
+    return numero;
+  });
+}
+
+// ---------- Circuito: derivar → asignar → (técnico) terminar → revisar → aprobar ----------
+// PARA ERIC: cada paso lo puede hacer solo el rol que corresponde (ver NOTAS-PARA-ERIC.md) y conviene
+// validarlo en la base. Los avisos a cada uno (y al celular o al mail) salen de estos cambios de etapa.
+
+function cambiarOT(id: string, cambio: (o: OrdenTrabajo) => OrdenTrabajo | null) {
+  actualizarDatos(d => {
+    let hubo = false;
+    const ordenes = d.ordenes.map(o => {
+      if (o.id !== id) return o;
+      const n = cambio(o);
+      if (!n) return o;
+      hubo = true;
+      return n;
+    });
+    return hubo ? { ...d, ordenes } : d;
+  });
+}
+
+/** El responsable manda una o varias OT al jefe de taller. */
+export function useDerivarOrdenes() {
+  return mutacionDemo(({ ids, cuando, quien }: { ids: string[]; cuando: string; quien: PersonaMantenimiento }) => {
     actualizarDatos(d => ({
       ...d,
-      ordenes: [...d.ordenes, {
-        id: nuevoId(), numero, tipo: 'correctiva', equipoId: o.equipoId, rutinaId: null, fechaProgramada: o.fechaProgramada,
-        tareas: o.tareas, tareasHechas: [], asignadoA: o.asignadoA, estado: 'pendiente', fechaCierre: null, observaciones: '',
-        horas: null, repuestosUsados: '', repuestos: o.repuestos,
-        correctivo: { prioridad: o.prioridad, falla: o.falla, causa: '', solucion: '', horasParada: null }, mediciones: [], valores: [], tecnicos: [], liberacion: null,
-      }],
+      ordenes: d.ordenes.map(o => (ids.includes(o.id) && o.etapa === 'por_derivar'
+        ? { ...o, etapa: 'por_asignar', pasos: [...o.pasos, paso(cuando, quien, 'Derivó al jefe de taller')] }
+        : o)),
     }));
-    return numero;
+  });
+}
+
+/** El jefe de taller asigna (o reasigna) la OT a uno o varios técnicos. */
+export function useAsignarOrden() {
+  return mutacionDemo(({ id, tecnicos, cuando, quien }: { id: string; tecnicos: PersonaMantenimiento[]; cuando: string; quien: PersonaMantenimiento }) => {
+    if (!tecnicos.length) throw new Error('Elegí al menos un técnico.');
+    const nombres = tecnicos.map(t => t.nombre).join(', ');
+    cambiarOT(id, o => (o.estado === 'terminada' ? null : {
+      ...o, etapa: 'asignada', asignados: tecnicos.map(t => t.id), asignadoA: nombres,
+      pasos: [...o.pasos, paso(cuando, quien, `${o.etapa === 'asignada' ? 'Reasignó' : 'Asignó'} a ${nombres}`)],
+    }));
+  });
+}
+
+/** El técnico termina la OT: queda para revisar (todavía no va al historial). */
+export function useTerminarOrden() {
+  return mutacionDemo(({ id, datos, cuando, quien }: { id: string; datos: DatosCierre; cuando: string; quien: PersonaMantenimiento }) => {
+    actualizarDatos(d => {
+      const ot = d.ordenes.find(o => o.id === id);
+      if (!ot || ot.estado === 'terminada') return d;
+      const rutina = d.rutinas.find(r => r.id === ot.rutinaId);
+      const r = terminarOrden(ot, datos, rutina, nuevoId, cuando, quien);
+      return {
+        ...d,
+        ordenes: d.ordenes.map(o => (o.id === id ? r.ot : o)),
+        rutinas: r.rutina ? d.rutinas.map(x => (x.id === r.rutina!.id ? r.rutina! : x)) : d.rutinas,
+      };
+    });
+  });
+}
+
+/** El jefe de taller revisó la OT y la pasa al responsable para que la apruebe. */
+export function usePasarAAprobacion() {
+  return mutacionDemo(({ id, cuando, quien, comentario }: { id: string; cuando: string; quien: PersonaMantenimiento; comentario: string }) => {
+    cambiarOT(id, o => (o.etapa !== 'a_revisar' ? null : { ...o, etapa: 'para_aprobar', pasos: [...o.pasos, paso(cuando, quien, 'Revisó y pasó a aprobación', comentario)] }));
+  });
+}
+
+/** El jefe de taller o el responsable devuelven la OT al técnico, con un comentario de qué falta. */
+export function useDevolverOrden() {
+  return mutacionDemo(({ id, cuando, quien, comentario }: { id: string; cuando: string; quien: PersonaMantenimiento; comentario: string }) => {
+    if (!comentario.trim()) throw new Error('Escribí qué tiene que corregir o completar.');
+    cambiarOT(id, o => (o.etapa !== 'a_revisar' && o.etapa !== 'para_aprobar' ? null : {
+      ...o, etapa: 'asignada', estado: 'en_curso', terminadaEn: null,
+      pasos: [...o.pasos, paso(cuando, quien, 'Devolvió al técnico', comentario.trim())],
+    }));
+  });
+}
+
+/**
+ * El responsable aprueba la OT: va al historial del equipo y se descuentan los repuestos. Si quedaron tareas
+ * sin hacer o valores fuera de rango, se generan OT nuevas para el jefe de taller. Devuelve sus números.
+ */
+export function useAprobarOrden() {
+  return mutacionDemo(({ id, opciones, cuando, quien }: { id: string; opciones: OpcionesAprobacion; cuando: string; quien: PersonaMantenimiento }): string[] => {
+    let nuevas: string[] = [];
+    actualizarDatos(d => {
+      const ot = d.ordenes.find(o => o.id === id);
+      if (!ot || ot.etapa !== 'para_aprobar') return d;
+      const r = aprobarOrden(ot, opciones, nuevoId, ultimoNumeroOT(d.ordenes), cuando, quien);
+      nuevas = r.nuevas.map(x => x.numero);
+      return {
+        ...d,
+        ordenes: [...d.ordenes.map(o => (o.id === id ? r.ot : o)), ...r.nuevas],
+        intervenciones: [...d.intervenciones, r.intervencion],
+        consumos: [...d.consumos, ...r.consumos],
+      };
+    });
+    return nuevas;
   });
 }
 
@@ -153,64 +250,6 @@ export function useCambiarEstadoOrden() {
 export function useMarcarTareas() {
   return mutacionDemo(({ id, tareasHechas }: { id: string; tareasHechas: boolean[] }) => {
     actualizarDatos(d => ({ ...d, ordenes: d.ordenes.map(o => (o.id === id && o.estado !== 'terminada' ? { ...o, tareasHechas } : o)) }));
-  });
-}
-
-/**
- * Terminar una OT: queda en el historial del equipo (con qué tareas se hicieron y cuáles no, y los valores
- * anotados) y, si es preventiva, se genera la siguiente. Con `pendientesEnOtNueva`, las tareas que faltaron
- * pasan a una OT correctiva nueva para el día siguiente; con `correctivaPorValores`, los valores fuera de
- * rango generan otra OT correctiva para revisarlos. Devuelve los números de las OT que se crearon.
- */
-export function useCerrarOrden() {
-  return mutacionDemo(({ id, datos, pendientesEnOtNueva, correctivaPorValores }: { id: string; datos: DatosCierre; pendientesEnOtNueva?: boolean; correctivaPorValores?: boolean }): { pendientes: string | null; valores: string | null } => {
-    let otNueva: string | null = null;
-    let otValores: string | null = null;
-    actualizarDatos(d => {
-      const ot = d.ordenes.find(o => o.id === id);
-      if (!ot || ot.estado === 'terminada') return d;
-      const rutina = d.rutinas.find(r => r.id === ot.rutinaId);
-      const r = cerrarOrden(ot, datos, rutina, nuevoId);
-      const extra: OrdenTrabajo[] = [];
-      let numero = ultimoNumeroOT(d.ordenes);
-      if (pendientesEnOtNueva && r.pendientes.length) {
-        otNueva = numeroOT(++numero);
-        // Las tareas que faltaron mantienen su medición (si la tenían).
-        const meds = medicionesDe(ot);
-        const pendMeds = r.ot.tareasHechas.flatMap((h, i) => (h ? [] : [meds[i] ?? null]));
-        extra.push({
-          id: nuevoId(), numero: otNueva, tipo: 'correctiva', equipoId: ot.equipoId, rutinaId: null, mediciones: pendMeds, valores: [], tecnicos: [], liberacion: null,
-          fechaProgramada: sumarDias(datos.fechaCierre, 1), tareas: r.pendientes.join('\n'), tareasHechas: [],
-          asignadoA: r.ot.asignadoA, estado: 'pendiente', fechaCierre: null,
-          observaciones: `Tareas que quedaron pendientes de la ${ot.numero}.`, horas: null, repuestosUsados: '',
-          // Los repuestos que no se llegaron a usar pasan a la OT nueva.
-          repuestos: datos.repuestos.filter(x => !x.usado).map(x => ({ ...x, id: nuevoId(), usado: null })),
-          correctivo: { prioridad: ot.correctivo?.prioridad ?? 'normal', falla: `Pendiente de ${ot.numero}${ot.correctivo?.falla ? `: ${ot.correctivo.falla}` : ''}`, causa: '', solucion: '', horasParada: null },
-        });
-      }
-      if (correctivaPorValores && r.fueraDeRango.length) {
-        otValores = numeroOT(++numero);
-        const detalle = r.fueraDeRango.map(f => `${f.texto}: ${numeroCorto(f.valor)} ${f.medicion.unidad} (${textoRango(f.medicion)})`.replace(/\s+\(/, ' ('));
-        extra.push({
-          id: nuevoId(), numero: otValores, tipo: 'correctiva', equipoId: ot.equipoId, rutinaId: null,
-          fechaProgramada: sumarDias(datos.fechaCierre, 1), tareasHechas: [], valores: [], tecnicos: [], liberacion: null,
-          // Una tarea para revisar la causa y otra para volver a medir cada valor fuera de rango.
-          tareas: [...detalle.map(x => `Buscar la causa — ${x}`), ...r.fueraDeRango.map(f => `Después de corregir: ${f.texto}`)].join('\n'),
-          mediciones: [...r.fueraDeRango.map(() => null), ...r.fueraDeRango.map(f => f.medicion)],
-          asignadoA: r.ot.asignadoA, estado: 'pendiente', fechaCierre: null, observaciones: `Valores fuera de rango en la ${ot.numero}.`,
-          horas: null, repuestosUsados: '', repuestos: [],
-          correctivo: { prioridad: 'normal', falla: `Valores fuera de rango en la ${ot.numero}: ${detalle.join('; ')}`, causa: '', solucion: '', horasParada: null },
-        });
-      }
-      return {
-        ...d,
-        ordenes: [...d.ordenes.map(o => (o.id === id ? r.ot : o)), ...extra],
-        intervenciones: [...d.intervenciones, r.intervencion],
-        consumos: [...d.consumos, ...r.consumos],
-        rutinas: r.rutina ? d.rutinas.map(x => (x.id === r.rutina!.id ? r.rutina! : x)) : d.rutinas,
-      };
-    });
-    return { pendientes: otNueva, valores: otValores };
   });
 }
 

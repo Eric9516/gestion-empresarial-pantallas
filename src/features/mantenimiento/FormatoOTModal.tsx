@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useConfigMantenimiento, useGuardarConfigMantenimiento } from './usePreventivo';
+import type { FranjaRecepcion } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,6 +18,8 @@ export default function FormatoOTModal({ open, onClose }: { open: boolean; onClo
   );
 }
 
+const DIAS: [number, string][] = [[1, 'Lunes'], [2, 'Martes'], [3, 'Miércoles'], [4, 'Jueves'], [5, 'Viernes'], [6, 'Sábado'], [0, 'Domingo']];
+
 function Formulario({ onClose }: { onClose: () => void }) {
   const uid = useId();
   const toast = useToast();
@@ -27,12 +30,16 @@ function Formulario({ onClose }: { onClose: () => void }) {
   const [vigencia, setVigencia] = useState(config.registroVigencia);
   const [controles, setControles] = useState(config.controlesLiberacion.join('\n'));
   const [recibe, setRecibe] = useState(config.recibeLiberacion);
+  const [horario, setHorario] = useState(config.horarioRecepcion);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     await guardar.mutateAsync({
+      ...config,
       registroCodigo: codigo.trim(), registroVersion: version.trim(), registroVigencia: vigencia,
       controlesLiberacion: controles.split(/\r?\n/).map(c => c.trim()).filter(Boolean), recibeLiberacion: recibe.trim(),
+      // Se descartan los días con el horario al revés (hasta antes que desde).
+      horarioRecepcion: { dias: horario.dias.filter(d => d.desde < d.hasta).sort((a, b) => ((a.dia + 6) % 7) - ((b.dia + 6) % 7)) },
     });
     toast('Formato guardado: se usa en las próximas OT que imprimas o termines', 'success');
     onClose();
@@ -62,6 +69,30 @@ function Formulario({ onClose }: { onClose: () => void }) {
         <div className="form-group full">
           <label htmlFor={`${uid}-r`}>Quién recibe el equipo</label>
           <Input id={`${uid}-r`} value={recibe} onChange={e => setRecibe(e.target.value)} placeholder="Ej.: Responsable de Producción" />
+        </div>
+        <div className="form-group full">
+          <label>Horario en que llegan las OT terminadas (al jefe de taller y al responsable)</label>
+          <div className="mt-horario">
+            {DIAS.map(([n, nombre]) => {
+              const f = horario.dias.find(d => d.dia === n);
+              const cambiar = (c: Partial<FranjaRecepcion>) => setHorario(h => ({ dias: h.dias.map(d => (d.dia === n ? { ...d, ...c } : d)) }));
+              return (
+                <div key={n} className="mt-horario-dia">
+                  <label>
+                    <input type="checkbox" checked={!!f} onChange={e => setHorario(h => ({ dias: e.target.checked ? [...h.dias, { dia: n, desde: '08:30', hasta: n === 6 ? '12:00' : '17:00' }] : h.dias.filter(d => d.dia !== n) }))} />
+                    {nombre}
+                  </label>
+                  {f ? (
+                    <span className="mt-horario-horas">
+                      de <Input type="time" aria-label={`${nombre} desde`} value={f.desde} onChange={e => cambiar({ desde: e.target.value })} />
+                      a <Input type="time" aria-label={`${nombre} hasta`} value={f.hasta} onChange={e => cambiar({ hasta: e.target.value })} />
+                    </span>
+                  ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No se reciben</span>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Las que se terminan fuera de horario esperan y llegan al empezar el próximo día marcado.</div>
         </div>
       </div>
       <div className="modal-footer">

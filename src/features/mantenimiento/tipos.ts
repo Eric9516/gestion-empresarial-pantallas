@@ -45,6 +45,11 @@ export interface RepuestoLinea {
   cantidad: number;
   /** Cantidad que realmente se usó, al terminar la OT (null mientras está abierta). */
   usado: number | null;
+  /**
+   * Precio por unidad, en pesos, que se anota al terminar la OT o al registrar el mantenimiento (para los costos
+   * del equipo). Queda guardado con el precio de ese día aunque después aumente. Sin anotar = null.
+   */
+  precio?: number | null;
 }
 
 export type Prioridad = 'urgente' | 'normal';
@@ -123,6 +128,26 @@ export interface ConfigMantenimiento {
   controlesLiberacion: string[];
   /** Quién firma la liberación (ej.: "Responsable de Producción"). */
   recibeLiberacion: string;
+  /** Valor de la hora hombre de mantenimiento, en pesos, uno solo para todos (para los costos). Sin cargar = null. */
+  costoHora: number | null;
+  /** Horario en que les llegan las OT terminadas al jefe de taller y al responsable (fuera de ese horario esperan). */
+  horarioRecepcion: HorarioRecepcion;
+}
+
+/**
+ * Gasto de un servicio externo (un técnico de afuera, un taller, un service), cargado directo en el equipo.
+ * PARA ERIC: tabla nueva (ver NOTAS-PARA-ERIC.md).
+ */
+export interface GastoExterno {
+  id: string;
+  equipoId: string;
+  fecha: FechaISO;
+  /** Quién lo hizo (empresa o persona). */
+  proveedor: string;
+  /** Qué se hizo. */
+  descripcion: string;
+  /** Monto en pesos. */
+  monto: number;
 }
 
 /** Una entrada del historial del equipo (lo que se hizo). */
@@ -150,6 +175,11 @@ export interface Intervencion {
   /** Técnicos que trabajaron, con sus horarios (si salió de una OT). */
   tecnicos: TrabajoTecnico[];
   liberacion: Liberacion | null;
+  /** Solo en preventivos: horas que el equipo estuvo parado (en los correctivos va en `correctivo.horasParada`). */
+  horasParada?: number | null;
+  /** Quién revisó (jefe de taller) y quién aprobó (responsable) la OT de la que salió. */
+  revisadoPor?: string | null;
+  aprobadoPor?: string | null;
 }
 
 /** Repuesto crítico de un equipo. Se vincula por código con los repuestos del Depósito. */
@@ -196,7 +226,51 @@ export interface RutinaPreventiva {
 }
 
 export type TipoOT = 'preventiva' | 'correctiva';
+/** Cómo va el trabajo: sin empezar, empezado, o terminado por el técnico. */
 export type EstadoOT = 'pendiente' | 'en_curso' | 'terminada';
+
+/**
+ * En qué parte del circuito está la OT (quién tiene que hacer algo con ella):
+ * - por_derivar: preventiva recién generada, la tiene que mandar el responsable al jefe de taller.
+ * - por_asignar: la tiene el jefe de taller, que la asigna a uno o varios técnicos.
+ * - asignada: la tienen los técnicos (pendiente o en curso).
+ * - a_revisar: el técnico la terminó; la revisa el jefe de taller.
+ * - para_aprobar: revisada; la aprueba el responsable. Recién ahí va al historial y descuenta repuestos.
+ * - aprobada: cerrada.
+ */
+export type EtapaOT = 'por_derivar' | 'por_asignar' | 'asignada' | 'a_revisar' | 'para_aprobar' | 'aprobada';
+
+/** Perfiles del módulo. PARA ERIC: roles nuevos de Mantenimiento (ver NOTAS-PARA-ERIC.md). */
+export type RolMantenimiento = 'responsable' | 'jefe' | 'tecnico';
+
+/** Una persona que usa el módulo. MODO DE EJEMPLO: inventadas, para probar el circuito con "Ver como". */
+export interface PersonaMantenimiento {
+  id: string;
+  nombre: string;
+  rol: RolMantenimiento;
+}
+
+/** Un paso del recorrido de la OT (quién hizo qué y cuándo), para saber siempre por dónde pasó. */
+export interface PasoOT {
+  /** Fecha y hora, "aaaa-mm-ddThh:mm". */
+  cuando: string;
+  quien: string;
+  accion: string;
+  comentario: string;
+}
+
+/** Un día de la semana en que se reciben OT terminadas, con su horario ("hh:mm"). */
+export interface FranjaRecepcion {
+  /** 0 = domingo ... 6 = sábado. */
+  dia: number;
+  desde: string;
+  hasta: string;
+}
+
+/** Horario en que les llegan las OT terminadas al jefe de taller y al responsable (cada día con su horario). */
+export interface HorarioRecepcion {
+  dias: FranjaRecepcion[];
+}
 
 /** Orden de trabajo. Las preventivas las genera sola cada rutina (una por aviso). */
 export interface OrdenTrabajo {
@@ -228,6 +302,43 @@ export interface OrdenTrabajo {
   /** Al terminar: técnicos con sus horarios y la liberación del equipo. */
   tecnicos: TrabajoTecnico[];
   liberacion: Liberacion | null;
+  /** Solo en preventivas, al terminar: horas que el equipo estuvo parado (en las correctivas va en `correctivo`). */
+  horasParada?: number | null;
+  /** En qué parte del circuito está (derivar, asignar, revisar, aprobar). */
+  etapa: EtapaOT;
+  /** Técnicos asignados (ids de PersonaMantenimiento). */
+  asignados: string[];
+  /** Recorrido: quién la derivó, asignó, terminó, revisó, devolvió o aprobó, y cuándo. */
+  pasos: PasoOT[];
+  /** Cuándo la terminó el técnico ("aaaa-mm-ddThh:mm"): de ahí sale cuándo les llega para revisar. */
+  terminadaEn: string | null;
+  /**
+   * Lo que cargó el técnico al terminar. Se guarda hasta que el responsable la aprueba: recién ahí pasa al
+   * historial del equipo y se descuentan los repuestos.
+   */
+  cierre: DatosCierre | null;
+}
+
+/** Lo que carga el técnico al terminar una OT. */
+export interface DatosCierre {
+  fechaCierre: FechaISO;
+  /** Qué tareas se hicieron (una marca por tarea). */
+  tareasHechas: boolean[];
+  realizadoPor: string;
+  observaciones: string;
+  horas: number | null;
+  /** Texto libre (opcional, además de los repuestos con detalle). */
+  repuestosUsados: string;
+  /** Los repuestos de la OT con la cantidad que realmente se usó (0 = no se cambió) y los que se agregaron. */
+  repuestos: RepuestoLinea[];
+  /** Técnicos con sus horarios (si se cargan, las horas son la suma de sus horas hombre). */
+  tecnicos?: TrabajoTecnico[];
+  /** Controles de entrega del equipo y quién lo recibió. */
+  liberacion?: Liberacion | null;
+  /** Solo correctivas: causa, solución y horas de parada (la prioridad y la falla vienen de la OT). */
+  correctivo?: Pick<DetalleCorrectivo, 'causa' | 'solucion' | 'horasParada'>;
+  /** Solo preventivas: horas que el equipo estuvo parado. */
+  horasParada?: number | null;
 }
 
 /**
@@ -264,5 +375,9 @@ export interface DatosMantenimiento {
   consumos: ConsumoStock[];
   /** Planillas de tareas armadas de antemano. */
   planillas: PlanillaTareas[];
+  /** Gastos de servicios externos, por equipo. */
+  gastosExternos: GastoExterno[];
   config: ConfigMantenimiento;
+  /** Personas del módulo (modo de ejemplo). */
+  personas: PersonaMantenimiento[];
 }

@@ -11,6 +11,13 @@ export interface ItemMenu {
   activo?: boolean;
   /** Número chico sobre el ícono (por ejemplo, lo que hay en "A retirar"). */
   cantidad?: number;
+  /**
+   * Sub-menú (por ejemplo, los sub-sectores de un sector). Si tiene, el ítem lleva una flechita y su onClick
+   * solo lo despliega o lo pliega (no cierra el menú). Se ven solo con el menú abierto.
+   */
+  hijos?: ItemMenu[];
+  /** Si el sub-menú está desplegado. */
+  desplegado?: boolean;
 }
 
 export interface SeccionMenu {
@@ -26,13 +33,24 @@ interface Props {
   onAlternarFijo: () => void;
 }
 
-function Item({ item, alElegir }: { item: ItemMenu; alElegir: () => void }) {
+function Item({ item, alElegir, sub = false, abierto }: { item: ItemMenu; alElegir: () => void; sub?: boolean; abierto: boolean }) {
+  const conHijos = !!item.hijos?.length;
   return (
-    <button type="button" className={`menu-lateral-item${item.activo ? ' activo' : ''}`} aria-current={item.activo ? 'page' : undefined} onClick={() => { item.onClick(); alElegir(); }}>
-      <span className="menu-lateral-icono">{item.icono}</span>
-      <span className="menu-lateral-texto">{item.titulo}</span>
-      {!!item.cantidad && <span className="menu-lateral-cant">{textoDeAviso(item.cantidad)}</span>}
-    </button>
+    <>
+      <button
+        type="button"
+        className={`menu-lateral-item${item.activo ? ' activo' : ''}${sub ? ' sub' : ''}`}
+        aria-current={item.activo ? 'page' : undefined}
+        aria-expanded={conHijos ? !!item.desplegado : undefined}
+        onClick={() => { item.onClick(); if (!conHijos) alElegir(); }}
+      >
+        <span className="menu-lateral-icono">{item.icono}</span>
+        <span className="menu-lateral-texto">{item.titulo}</span>
+        {conHijos && <span className={`menu-lateral-flecha${item.desplegado ? ' desplegada' : ''}`} aria-hidden="true"><Icono n="desplegar" /></span>}
+        {!!item.cantidad && <span className="menu-lateral-cant">{textoDeAviso(item.cantidad)}</span>}
+      </button>
+      {conHijos && item.desplegado && abierto && item.hijos!.map(h => <Item key={h.clave} item={h} alElegir={alElegir} sub abierto={abierto} />)}
+    </>
   );
 }
 
@@ -70,12 +88,12 @@ export default function MenuLateral({ secciones, pie = [], fijo, onAlternarFijo 
         {secciones.map((seccion, i) => (
           <div key={seccion.titulo} role="group" aria-label={seccion.titulo}>
             <div className={`menu-lateral-grupo${i === 0 ? ' primero' : ''}`} aria-hidden="true"><span>{seccion.titulo}</span></div>
-            {seccion.items.map(item => <Item key={item.clave} item={item} alElegir={cerrar} />)}
+            {seccion.items.map(item => <Item key={item.clave} item={item} alElegir={cerrar} abierto={abierto} />)}
           </div>
         ))}
       </div>
       <div className="menu-lateral-pie">
-        {pie.map(item => <Item key={item.clave} item={item} alElegir={cerrar} />)}
+        {pie.map(item => <Item key={item.clave} item={item} alElegir={cerrar} abierto={abierto} />)}
         <button type="button" className="menu-lateral-item" onClick={onAlternarFijo} aria-pressed={fijo}>
           <span className="menu-lateral-icono"><Icono n="fijar" /></span>
           <span className="menu-lateral-texto">{fijo ? 'Soltar menú' : 'Dejar fijo'}</span>

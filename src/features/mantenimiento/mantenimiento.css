@@ -212,3 +212,116 @@
 .mt-buscador-rep-stock { margin-left: auto; font-size: 12px; color: var(--text-muted); }
 .mt-buscador-rep-vacio { font-size: 13px; color: var(--text-muted); padding: 6px 8px; }
 .mt-rep-elegido { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+
+/* Pantalla de un equipo (en lugar de la lista): botón para volver arriba. */
+.mt-volver { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; padding: 6px 0; border: none; background: none; color: var(--blue); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.mt-volver:hover { text-decoration: underline; }
+.mt-pantalla-equipo .section-title .mt-card-codigo { font-size: 13px; }
+
+/* ===== Inicio: disponibilidad de los equipos =====
+   Dos colores de serie (validados para daltonismo): correctivo naranja, preventivo verde agua.
+   Las horas y el porcentaje van siempre escritos al lado (el color nunca va solo). */
+.mt-screen { --serie-corr: #eb6834; --serie-prev: #1baf7a; }
+.mt-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.mt-kpi { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.mt-kpi.principal { grid-column: 1 / -1; }
+.mt-kpi-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.mt-kpi-valor { font-size: 24px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.mt-kpi.principal .mt-kpi-valor { font-size: 34px; color: var(--blue); }
+.mt-kpi-sub { font-size: 13px; color: var(--text-mid); }
+@media (min-width: 900px) {
+  .mt-kpis { grid-template-columns: 2fr 1fr 1fr; }
+  .mt-kpi.principal { grid-column: auto; }
+}
+.mt-leyenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-mid); margin: 2px 0 8px; }
+.mt-leyenda > span { display: inline-flex; align-items: center; gap: 6px; }
+.mt-leyenda-color { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.mt-leyenda-color.corr { background: var(--serie-corr); }
+.mt-leyenda-color.prev { background: var(--serie-prev); }
+.mt-disp-lista { display: flex; flex-direction: column; }
+.mt-disp-fila { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 9px 0; border-top: 1px solid var(--border); text-align: left; font-family: var(--font); color: var(--text); }
+.mt-disp-fila:first-child { border-top: none; }
+.mt-disp-fila.boton { background: none; border-left: none; border-right: none; border-bottom: none; cursor: pointer; width: 100%; }
+.mt-disp-fila.boton:hover .mt-disp-nombre { color: var(--blue); text-decoration: underline; }
+.mt-disp-nombre { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mt-disp-cant { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.mt-disp-datos { font-size: 12px; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+.mt-disp-datos strong { font-size: 13px; color: var(--text); margin-right: 4px; }
+/* Barra de horas paradas: sobre un riel gris; 2 px de separación entre correctivo y preventivo. */
+.mt-barra { display: flex; gap: 2px; height: 10px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.mt-barra-seg { display: block; height: 100%; border-radius: 4px; min-width: 3px; }
+.mt-barra-seg.corr { background: var(--serie-corr); }
+.mt-barra-seg.prev { background: var(--serie-prev); }
+@media (min-width: 900px) {
+  .mt-disp-fila { grid-template-columns: minmax(180px, 1.2fr) 2fr minmax(220px, 1.2fr); align-items: center; gap: 14px; }
+}
+.mt-nota { font-size: 12px; color: var(--text-muted); margin: 4px 0 16px; line-height: 1.5; }
+
+/* ===== Costos del equipo (solapa Datos) ===== */
+.mt-costos { margin-top: 14px; }
+.mt-costos-tabla { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.mt-costos-tabla th { text-align: left; font-weight: 600; color: var(--text-mid); padding: 6px 0; text-transform: none; letter-spacing: 0; font-size: 14px; background: none; }
+.mt-costos-tabla td { text-align: right; font-weight: 700; color: var(--text); padding: 6px 0; }
+.mt-costos-tabla tr + tr th, .mt-costos-tabla tr + tr td { border-top: 1px solid var(--border); }
+.mt-costos-tabla tr.total th, .mt-costos-tabla tr.total td { border-top: 1.5px solid var(--text-muted); font-size: 16px; font-weight: 800; color: var(--blue); }
+.mt-costos-aclara { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.mt-costos-avisos { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; font-size: 12px; color: #9a5b12; }
+.mt-costos-avisos > div { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mt-costos-pie { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
+.mt-costos-detalle { margin-top: 8px; border-top: 1px solid var(--border); }
+.mt-costos-linea { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.mt-costos-linea-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; color: var(--text-mid); font-size: 12px; }
+.mt-costos-linea-top strong { color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mt-costos-linea-texto { margin-top: 2px; color: var(--text); }
+
+/* Circuito de las OT: colores (verde = mandar, amarillo = pendiente/en curso, rojo = vencida, azul = revisar/aprobar) */
+.mt-aviso.verde { background: #e7f6ee; border-color: #a9dcc0; color: #17643f; }
+.mt-ver-como { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-weight: 700; color: var(--text); }
+.mt-ver-como select { font: inherit; font-weight: 600; padding: 4px 6px; border-radius: 6px; border: 1px solid #b7c9ea; background: white; }
+.mt-tipos-ot { display: flex; gap: 6px; margin-bottom: 12px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 4px; }
+.mt-tipo-ot { flex: 1; border: none; background: none; padding: 10px 12px; border-radius: calc(var(--radius) - 3px); font-family: var(--font); font-size: 14px; font-weight: 800; color: var(--text-mid); cursor: pointer; display: inline-flex; gap: 8px; justify-content: center; align-items: center; }
+.mt-tipo-ot.activo { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.mt-tipo-ot-num { font-size: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
+.mt-grupo-ot { margin-bottom: 18px; }
+.mt-grupo-ot-titulo { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+.mt-punto { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.mt-grupo-ot.verde .mt-punto { background: #22a06b; }
+.mt-grupo-ot.amarillo .mt-punto { background: #e3a008; }
+.mt-grupo-ot.rojo .mt-punto { background: var(--danger); }
+.mt-grupo-ot.azul .mt-punto { background: #2f6fd6; }
+.mt-grupo-ot.gris .mt-punto { background: #9aa5b1; }
+.mt-card-ot { border-left-width: 6px; }
+.mt-card-ot.verde { border-left-color: #22a06b; background: #f3fbf6; }
+.mt-card-ot.amarillo { border-left-color: #e3a008; }
+.mt-card-ot.rojo { border-left-color: var(--danger); background: #fff7f6; }
+.mt-card-ot.azul { border-left-color: #2f6fd6; background: #f4f8ff; }
+.mt-card-ot.gris { border-left-color: #9aa5b1; opacity: 0.85; }
+.mt-tag.etapa { background: var(--surface2); }
+.mt-tag.etapa.por_derivar { background: #e7f6ee; border-color: #a9dcc0; color: #17643f; }
+.mt-tag.etapa.por_asignar, .mt-tag.etapa.asignada { background: #fff6e0; border-color: #f3d58a; color: #8a5a00; }
+.mt-tag.etapa.a_revisar, .mt-tag.etapa.para_aprobar { background: #eaf1fd; border-color: #bcd2f5; color: #1f4f9e; }
+.mt-en-espera { font-size: 12px; color: var(--text-mid); background: var(--surface2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 10px; display: flex; gap: 6px; align-items: center; margin: 0 0 12px; }
+.mt-etapa { display: flex; flex-direction: column; gap: 4px; border: 1.5px solid var(--border); border-left-width: 6px; border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 12px; font-size: 13px; background: var(--surface2); }
+.mt-etapa.por_derivar { border-left-color: #22a06b; }
+.mt-etapa.por_asignar, .mt-etapa.asignada { border-left-color: #e3a008; }
+.mt-etapa.a_revisar, .mt-etapa.para_aprobar { border-left-color: #2f6fd6; }
+.mt-etapa.aprobada { border-left-color: #9aa5b1; }
+.mt-recorrido { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-mid); }
+.mt-recorrido span { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.mt-opcion { display: flex; gap: 8px; align-items: center; cursor: pointer; font-weight: 700; font-size: 14px; margin: 6px 0; text-transform: none; letter-spacing: normal; }
+.mt-opcion input { width: 18px; height: 18px; flex-shrink: 0; }
+.mt-horario { display: flex; flex-direction: column; gap: 6px; }
+.mt-horario-dia { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 40px; }
+.mt-horario-dia > label { display: flex; gap: 8px; align-items: center; width: 110px; font-weight: 700; font-size: 14px; cursor: pointer; text-transform: none; letter-spacing: normal; margin: 0; }
+.mt-horario-dia > label input { width: 18px; height: 18px; }
+.mt-horario-horas { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; }
+.mt-horario-horas input { width: 120px; padding-top: 6px; padding-bottom: 6px; }
+.mt-lista-simple { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+
+/* Ventana del día del calendario: cada OT con su color a la izquierda. */
+.mt-fila-color { border-left: 5px solid transparent; padding-left: 10px; padding-right: 4px; }
+.mt-fila-color.verde { border-left-color: #22a06b; }
+.mt-fila-color.amarillo { border-left-color: #e3a008; }
+.mt-fila-color.rojo { border-left-color: var(--danger); }
+.mt-fila-color.azul { border-left-color: #2f6fd6; }
+.mt-fila-color.gris { border-left-color: #9aa5b1; }

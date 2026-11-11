@@ -48,7 +48,8 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
   const [falla, setFalla] = useState(c?.falla ?? '');
   const [causa, setCausa] = useState(c?.causa ?? '');
   const [solucion, setSolucion] = useState(c?.solucion ?? '');
-  const [parada, setParada] = useState(c?.horasParada != null ? String(c.horasParada) : '');
+  const paradaGuardada = c?.horasParada ?? intervencion?.horasParada ?? null;
+  const [parada, setParada] = useState(paradaGuardada != null ? String(paradaGuardada) : '');
   const componentes = useComponentesDeEquipo(intervencion?.equipoId ?? equipoId);
   const nueva = !intervencion;
 
@@ -57,7 +58,7 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
     if (!descripcion.trim()) { toast('Contá qué se hizo.', 'error'); return; }
     const h = horas.trim() ? Number(horas.replace(',', '.')) : null;
     if (h != null && (!Number.isFinite(h) || h < 0)) { toast('Las horas tienen que ser un número.', 'error'); return; }
-    const hp = tipo === 'correctivo' && parada.trim() ? Number(parada.replace(',', '.')) : null;
+    const hp = parada.trim() ? Number(parada.replace(',', '.')) : null;
     if (hp != null && (!Number.isFinite(hp) || hp < 0)) { toast('Las horas de parada tienen que ser un número.', 'error'); return; }
     const usados = limpiarLineas(lineas).filter(l => l.cantidad > 0).map(l => ({ ...l, usado: l.cantidad }));
     try {
@@ -67,6 +68,7 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
         repuestos: usados, tareas: intervencion?.tareas ?? [], otNumero: intervencion?.otNumero ?? null,
         tecnicos: intervencion?.tecnicos ?? [], liberacion: intervencion?.liberacion ?? null,
         correctivo: tipo === 'correctivo' ? { prioridad, falla: falla.trim(), causa: causa.trim(), solucion: solucion.trim(), horasParada: hp } : null,
+        horasParada: tipo === 'preventivo' ? hp : null,
         descontarStock: nueva && descontar,
       });
       const descontados = nueva && descontar ? usados.filter(l => l.codigo).length : 0;
@@ -104,12 +106,12 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
           <label htmlFor={`${uid}-h`}>Horas de trabajo</label>
           <Input id={`${uid}-h`} inputMode="decimal" value={horas} onChange={e => setHoras(e.target.value)} placeholder="Ej.: 1,5" />
         </div>
+        <div className="form-group">
+          <label htmlFor={`${uid}-hp`}>Horas de equipo parado</label>
+          <Input id={`${uid}-hp`} inputMode="decimal" value={parada} onChange={e => setParada(e.target.value)} placeholder={tipo === 'correctivo' ? 'Ej.: 3,5' : 'Vacío si no se paró'} />
+        </div>
         {tipo === 'correctivo' && (
           <>
-            <div className="form-group">
-              <label htmlFor={`${uid}-hp`}>Horas de equipo parado</label>
-              <Input id={`${uid}-hp`} inputMode="decimal" value={parada} onChange={e => setParada(e.target.value)} placeholder="Ej.: 3,5" />
-            </div>
             <div className="form-group full">
               <label>Prioridad</label>
               <div className="mt-chips" role="radiogroup" aria-label="Prioridad" style={{ marginBottom: 0 }}>
@@ -136,7 +138,7 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
         )}
         <div className="form-group full">
           <label>Repuestos usados</label>
-          <RepuestosEditor lineas={lineas} onChange={setLineas} componentes={componentes} />
+          <RepuestosEditor lineas={lineas} onChange={setLineas} componentes={componentes} conPrecio />
           {nueva && lineas.some(l => l.codigo.trim()) && (
             <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontWeight: 700, marginTop: 8 }}>
               <input type="checkbox" checked={descontar} onChange={e => setDescontar(e.target.checked)} style={{ width: 18, height: 18 }} />

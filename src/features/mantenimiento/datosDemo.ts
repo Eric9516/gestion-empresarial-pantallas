@@ -6,7 +6,7 @@
 import { fechaHoyISO } from '../../lib/fechaHoy';
 import { sumarDias } from './fechas';
 import { aplicarPlanillas, configInicial, sincronizarOrdenes } from './preventivo';
-import type { DatosMantenimiento, Equipo, Intervencion, Medicion, PlanillaTareas, RepuestoCritico, RutinaPreventiva, TareaRegistrada } from './tipos';
+import type { OrdenTrabajo, PersonaMantenimiento, DatosMantenimiento, Equipo, GastoExterno, Intervencion, Medicion, PlanillaTareas, RepuestoCritico, RutinaPreventiva, TareaRegistrada } from './tipos';
 
 function pasteurizador(n: string, id: string, serie: string): Equipo[] {
   const codigo = `PA-0${n}`;
@@ -78,18 +78,18 @@ export function crearDatosDemo(hoy = fechaHoyISO()): DatosMantenimiento {
   ];
 
   const intervenciones: Intervencion[] = [
-    { id: 'in-1', equipoId: 'eq-1', fecha: d(-40), tipo: 'correctivo', descripcion: 'Pérdida por sello mecánico. Se cambió el sello.', realizadoPor: 'Técnico 1', horas: 3, repuestosUsados: '', otId: null, repuestos: [{ id: 'rl-1', componente: 'Sello mecánico', codigo: 'EJ-SELLO-01', descripcion: 'Sello mecánico (ejemplo)', cantidad: 1, usado: 1 }], tareas: [], correctivo: { prioridad: 'urgente', falla: 'Pierde agua por el sello', causa: 'Sello gastado por trabajo en seco', solucion: 'Cambio de sello y control de nivel de succión', horasParada: 2 }, otNumero: null, tecnicos: [], liberacion: null },
+    { id: 'in-1', equipoId: 'eq-1', fecha: d(-40), tipo: 'correctivo', descripcion: 'Pérdida por sello mecánico. Se cambió el sello.', realizadoPor: 'Técnico 1', horas: 3, repuestosUsados: '', otId: null, repuestos: [{ id: 'rl-1', componente: 'Sello mecánico', codigo: 'EJ-SELLO-01', descripcion: 'Sello mecánico (ejemplo)', cantidad: 1, usado: 1, precio: 85000 }], tareas: [], correctivo: { prioridad: 'urgente', falla: 'Pierde agua por el sello', causa: 'Sello gastado por trabajo en seco', solucion: 'Cambio de sello y control de nivel de succión', horasParada: 2 }, otNumero: null, tecnicos: [], liberacion: null },
     { id: 'in-10', equipoId: 'eq-1', fecha: d(-54), tipo: 'preventivo', descripcion: 'Preventivo mensual de la bomba.', realizadoPor: 'Técnico 2', horas: 1, repuestosUsados: '', otId: null, repuestos: [], tareas: tareasBomba(1.8, 52, 13.4), correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
     { id: 'in-11', equipoId: 'eq-1', fecha: d(-26), tipo: 'preventivo', descripcion: 'Preventivo mensual de la bomba.', realizadoPor: 'Técnico 2', horas: 1, repuestosUsados: '', otId: null, repuestos: [], tareas: tareasBomba(2.3, 58, 13.9), correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
-    { id: 'in-2', equipoId: 'eq-1', fecha: d(-12), tipo: 'preventivo', descripcion: 'Preventivo mensual de la bomba. La vibración viene subiendo.', realizadoPor: 'Técnico 2', horas: 1, repuestosUsados: 'Grasa', otId: null, repuestos: [], tareas: tareasBomba(3.9, 66, 14.6), correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
+    { id: 'in-2', equipoId: 'eq-1', fecha: d(-12), tipo: 'preventivo', descripcion: 'Preventivo mensual de la bomba. La vibración viene subiendo.', realizadoPor: 'Técnico 2', horas: 1, repuestosUsados: 'Grasa', otId: null, repuestos: [], tareas: tareasBomba(3.9, 66, 14.6), correctivo: null, otNumero: null, tecnicos: [], liberacion: null, horasParada: 1 },
     { id: 'in-12', equipoId: 'eq-2', fecha: d(-50), tipo: 'preventivo', descripcion: 'Preventivo mensual del compresor.', realizadoPor: 'Técnico 1', horas: 1.5, repuestosUsados: '', otId: null, repuestos: [], tareas: tareasCompresor(7.2, 84), correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
-    { id: 'in-3', equipoId: 'eq-2', fecha: d(-20), tipo: 'preventivo', descripcion: 'Preventivo mensual del compresor. Temperatura de salida alta.', realizadoPor: 'Técnico 1', horas: 1.5, repuestosUsados: '1 filtro de aire', otId: null, repuestos: [], tareas: tareasCompresor(7.0, 97), correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
-    { id: 'in-4', equipoId: 'eq-3', fecha: d(-8), tipo: 'correctivo', descripcion: 'Ruido en motorreductor: rodamiento dañado. Se reemplazó.', realizadoPor: 'Técnico 2', horas: 2.5, repuestosUsados: '', otId: null, repuestos: [{ id: 'rl-2', componente: 'Motorreductor lado salida', codigo: 'EJ-ROD-6204', descripcion: 'Rodamiento de motorreductor (ejemplo)', cantidad: 2, usado: 2 }], tareas: [], correctivo: { prioridad: 'normal', falla: 'Ruido fuerte en el motorreductor', causa: 'Rodamiento sin lubricación', solucion: 'Cambio de rodamientos y engrase', horasParada: 3 }, otNumero: null, tecnicos: [], liberacion: null },
-    { id: 'in-5', equipoId: 'eq-4', fecha: d(-3), tipo: 'correctivo', descripcion: 'Falla de cilindro neumático de corte. Se cambió el kit de juntas.', realizadoPor: 'Técnico 1', horas: 2, repuestosUsados: '1 kit de juntas', otId: null, repuestos: [], tareas: [], correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
+    { id: 'in-3', equipoId: 'eq-2', fecha: d(-20), tipo: 'preventivo', descripcion: 'Preventivo mensual del compresor. Temperatura de salida alta.', realizadoPor: 'Técnico 1', horas: 1.5, repuestosUsados: '1 filtro de aire', otId: null, repuestos: [], tareas: tareasCompresor(7.0, 97), correctivo: null, otNumero: null, tecnicos: [], liberacion: null, horasParada: 1.5 },
+    { id: 'in-4', equipoId: 'eq-3', fecha: d(-8), tipo: 'correctivo', descripcion: 'Ruido en motorreductor: rodamiento dañado. Se reemplazó.', realizadoPor: 'Técnico 2', horas: 2.5, repuestosUsados: '', otId: null, repuestos: [{ id: 'rl-2', componente: 'Motorreductor lado salida', codigo: 'EJ-ROD-6204', descripcion: 'Rodamiento de motorreductor (ejemplo)', cantidad: 2, usado: 2, precio: 32000 }], tareas: [], correctivo: { prioridad: 'normal', falla: 'Ruido fuerte en el motorreductor', causa: 'Rodamiento sin lubricación', solucion: 'Cambio de rodamientos y engrase', horasParada: 3 }, otNumero: null, tecnicos: [], liberacion: null },
+    { id: 'in-5', equipoId: 'eq-4', fecha: d(-3), tipo: 'correctivo', descripcion: 'Falla de cilindro neumático de corte. Se cambió el kit de juntas.', realizadoPor: 'Técnico 1', horas: 2, repuestosUsados: '1 kit de juntas', otId: null, repuestos: [], tareas: [], correctivo: { prioridad: 'urgente', falla: 'No corta el envase', causa: 'Juntas del cilindro gastadas', solucion: 'Cambio del kit de juntas', horasParada: 5 }, otNumero: null, tecnicos: [], liberacion: null },
     { id: 'in-6', equipoId: 'eq-5', fecha: d(-60), tipo: 'preventivo', descripcion: 'Limpieza de condensador y control de presiones.', realizadoPor: 'Técnico 3', horas: 2, repuestosUsados: '', otId: null, repuestos: [], tareas: [], correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
-    { id: 'in-8', equipoId: 'eq-p1-pl', fecha: d(-15), tipo: 'correctivo', descripcion: 'Pérdida entre placas. Se cambiaron 4 juntas.', realizadoPor: 'Técnico 1', horas: 4, repuestosUsados: '4 juntas de placa', otId: null, repuestos: [], tareas: [], correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
+    { id: 'in-8', equipoId: 'eq-p1-pl', fecha: d(-15), tipo: 'correctivo', descripcion: 'Pérdida entre placas. Se cambiaron 4 juntas.', realizadoPor: 'Técnico 1', horas: 4, repuestosUsados: '4 juntas de placa', otId: null, repuestos: [], tareas: [], correctivo: { prioridad: 'urgente', falla: 'Pérdida entre placas', causa: 'Juntas vencidas', solucion: 'Cambio de 4 juntas', horasParada: 8 }, otNumero: null, tecnicos: [], liberacion: null },
     { id: 'in-9', equipoId: 'eq-p1-b1', fecha: d(-30), tipo: 'preventivo', descripcion: 'Cambio de sello y control de rodamientos.', realizadoPor: 'Técnico 2', horas: 1.5, repuestosUsados: '1 sello', otId: null, repuestos: [], tareas: [], correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
-    { id: 'in-7', equipoId: 'eq-8', fecha: d(-25), tipo: 'preventivo', descripcion: 'Purga de fondo y control de quemador.', realizadoPor: 'Técnico 3', horas: 1, repuestosUsados: '', otId: null, repuestos: [], tareas: [], correctivo: null, otNumero: null, tecnicos: [], liberacion: null },
+    { id: 'in-7', equipoId: 'eq-8', fecha: d(-25), tipo: 'preventivo', descripcion: 'Purga de fondo y control de quemador.', realizadoPor: 'Técnico 3', horas: 1, repuestosUsados: '', otId: null, repuestos: [], tareas: [], correctivo: null, otNumero: null, tecnicos: [], liberacion: null, horasParada: 2 },
   ];
 
   const repuestosCriticos: RepuestoCritico[] = [
@@ -116,8 +116,73 @@ export function crearDatosDemo(hoy = fechaHoyISO()): DatosMantenimiento {
   // Las rutinas de la bomba y del compresor toman sus tareas de una planilla.
   const rutinas = aplicarPlanillas(rutinasSinPlanilla, planillas);
   let n = 0;
-  const ordenes = sincronizarOrdenes(rutinas, [], () => `ot-${++n}`);
+  const generadas = sincronizarOrdenes(rutinas, [], () => `ot-${++n}`);
+  const ordenes = recorridoDeEjemplo(generadas, d);
 
   const sectores = [...new Set(equipos.map(e => e.sector))];
-  return { sectores, subsectores: [], ordenSectores: [], equipos, intervenciones, repuestosCriticos, manuales: [], rutinas, ordenes, consumos: [], planillas, config: { ...configInicial(), registroCodigo: 'REG-MANT-01 (ejemplo)', registroVersion: '01', registroVigencia: d(-200) } };
+  const gastosExternos: GastoExterno[] = [
+    { id: 'ge-1', equipoId: 'eq-2', fecha: d(-35), proveedor: 'Service de compresores (ejemplo)', descripcion: 'Service de las 4000 horas', monto: 420000 },
+    { id: 'ge-2', equipoId: 'eq-5', fecha: d(-18), proveedor: 'Frigorista (ejemplo)', descripcion: 'Carga de gas refrigerante', monto: 150000 },
+  ];
+
+  return { sectores, subsectores: [], ordenSectores: [], equipos, intervenciones, repuestosCriticos, manuales: [], rutinas, ordenes, consumos: [], planillas, gastosExternos, personas: PERSONAS, config: { ...configInicial(), registroCodigo: 'REG-MANT-01 (ejemplo)', registroVersion: '01', registroVigencia: d(-200), costoHora: 15000 } };
 }
+
+/** Personas inventadas para probar el circuito de las OT con "Ver como". */
+export const PERSONAS: PersonaMantenimiento[] = [
+  { id: 'p-resp', nombre: 'Responsable (vos)', rol: 'responsable' },
+  { id: 'p-jefe', nombre: 'Jefe de taller', rol: 'jefe' },
+  { id: 'p-t1', nombre: 'Técnico 1', rol: 'tecnico' },
+  { id: 'p-t2', nombre: 'Técnico 2', rol: 'tecnico' },
+  { id: 'p-t3', nombre: 'Técnico 3', rol: 'tecnico' },
+];
+
+/** Deja las OT de ejemplo en distintas partes del circuito, para que se vea cada color. */
+function recorridoDeEjemplo(ordenes: OrdenTrabajo[], d: (dias: number) => string): OrdenTrabajo[] {
+  const t = (id: string) => PERSONAS.find(p => p.id === id)!.nombre;
+  const res = ordenes.map(o => {
+    if (o.rutinaId === 'ru-3') {
+      // Cinta: vencida, asignada y empezada.
+      return { ...o, etapa: 'asignada' as const, estado: 'en_curso' as const, asignados: ['p-t2'], asignadoA: t('p-t2'), pasos: [
+        { cuando: `${d(-6)}T08:40`, quien: 'Responsable (vos)', accion: 'Derivó al jefe de taller', comentario: '' },
+        { cuando: `${d(-6)}T09:10`, quien: 'Jefe de taller', accion: `Asignó a ${t('p-t2')}`, comentario: '' },
+      ] };
+    }
+    if (o.rutinaId === 'ru-4') {
+      // Equipo de frío: derivada, falta que el jefe la asigne.
+      return { ...o, etapa: 'por_asignar' as const, pasos: [{ cuando: `${d(-3)}T09:00`, quien: 'Responsable (vos)', accion: 'Derivó al jefe de taller', comentario: '' }] };
+    }
+    if (o.rutinaId === 'ru-2') {
+      // Compresor: asignada a dos técnicos.
+      return { ...o, etapa: 'asignada' as const, asignados: ['p-t1', 'p-t3'], asignadoA: `${t('p-t1')}, ${t('p-t3')}`, pasos: [
+        { cuando: `${d(-1)}T08:45`, quien: 'Responsable (vos)', accion: 'Derivó al jefe de taller', comentario: '' },
+        { cuando: `${d(-1)}T10:00`, quien: 'Jefe de taller', accion: `Asignó a ${t('p-t1')}, ${t('p-t3')}`, comentario: '' },
+      ] };
+    }
+    return o;
+  });
+  // Dos correctivas que cargaron los técnicos después de un llamado de guardia.
+  const correctiva = (num: number, equipoId: string, dia: number, hora: string, tecnico: string, etapa: 'a_revisar' | 'para_aprobar', falla: string, causa: string, solucion: string, observaciones: string, parada: number): OrdenTrabajo => {
+    const fecha = d(dia);
+    const pasos = [{ cuando: `${fecha}T${hora}`, quien: t(tecnico), accion: 'Cargó la OT correctiva y la terminó', comentario: '' }];
+    if (etapa === 'para_aprobar') pasos.push({ cuando: `${d(dia + 1)}T09:15`, quien: 'Jefe de taller', accion: 'Revisó y pasó a aprobación', comentario: '' });
+    const tecnicos = [{ id: `tt-${num}`, nombre: t(tecnico), fecha, inicio: '06:30', fin: hora }];
+    return {
+      id: `ot-c${num}`, numero: `OT-${String(num).padStart(4, '0')}`, tipo: 'correctiva', equipoId, rutinaId: null, fechaProgramada: fecha,
+      tareas: '', tareasHechas: [], asignadoA: t(tecnico), estado: 'terminada', fechaCierre: fecha,
+      observaciones, horas: null, repuestosUsados: '', repuestos: [], mediciones: [], valores: [], tecnicos, liberacion: null,
+      correctivo: { prioridad: 'urgente', falla, causa, solucion, horasParada: parada },
+      etapa, asignados: [tecnico], pasos, terminadaEn: `${fecha}T${hora}`,
+      cierre: {
+        fechaCierre: fecha, tareasHechas: [], realizadoPor: t(tecnico), observaciones, horas: null, repuestosUsados: '', repuestos: [], tecnicos, liberacion: null,
+        correctivo: { causa, solucion, horasParada: parada },
+      },
+    };
+  };
+  return [
+    ...res,
+    correctiva(8, 'eq-4', -2, '09:50', 'p-t1', 'para_aprobar', 'Llamado de guardia: la envasadora no corta el envase', 'Cuchilla desafilada', 'Se revisó el cilindro de corte, se cambió la cuchilla, se ajustó el recorrido y se probó en marcha.', '', 2),
+    correctiva(9, 'eq-3', -1, '15:20', 'p-t2', 'a_revisar', 'Llamado de guardia: la cinta se frena', 'Rodillo trabado', 'Se destrabó y se engrasó el rodillo. La cinta quedó funcionando.', 'Falta cambiar el rodamiento del rodillo (no había en el depósito).', 1.5),
+  ];
+}
+

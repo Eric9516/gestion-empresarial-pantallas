@@ -15,6 +15,10 @@ export interface MobileNavItem {
   active?: boolean;
   /** Número rojo (por ejemplo, lo que hay para retirar o las novedades). */
   cantidad?: number;
+  /** Ítem de un sub-menú (va con sangría, debajo de su ítem principal). */
+  sub?: boolean;
+  /** Si el ítem despliega un sub-menú: lleva flechita y al tocarlo no se cierra el menú. */
+  desplegable?: 'abierto' | 'cerrado';
 }
 
 interface Props {
@@ -66,8 +70,14 @@ export default function MobileMenu({ open, onClose, navItems }: Props) {
 
         <nav className="mobile-menu-nav" aria-label="Menú principal">
           {navItems.map((item, i) => (
-            <button key={i} className={`mobile-nav-item${item.active ? ' active' : ''}`} onClick={() => ir(item.onClick)}>
-              <span className="mobile-nav-icon">{item.icon}</span><span>{item.label}</span>
+            <button
+              key={i}
+              className={`mobile-nav-item${item.active ? ' active' : ''}${item.sub ? ' sub' : ''}`}
+              aria-expanded={item.desplegable ? item.desplegable === 'abierto' : undefined}
+              onClick={() => (item.desplegable ? item.onClick() : ir(item.onClick))}
+            >
+              {!item.sub && <span className="mobile-nav-icon">{item.icon}</span>}<span>{item.label}</span>
+              {item.desplegable && <span className={`mobile-nav-flecha${item.desplegable === 'abierto' ? ' desplegada' : ''}`} aria-hidden="true"><Icono n="desplegar" /></span>}
               {!!item.cantidad && <span className="aviso-numero">{textoDeAviso(item.cantidad)}</span>}
             </button>
           ))}

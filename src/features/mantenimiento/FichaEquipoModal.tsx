@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
@@ -15,12 +15,15 @@ import { usePlanillasQuery } from './usePreventivo';
 import ListaRepuestos from './ListaRepuestos';
 import DetalleCierre from './DetalleCierre';
 import { normalizar } from './buscador';
+import { horasParadaDe } from './disponibilidad';
 import EquipoForm from './EquipoForm';
+import CostosEquipo from './CostosEquipo';
 import IntervencionForm from './IntervencionForm';
 import RepuestoCriticoForm from './RepuestoCriticoForm';
 import RutinaForm from './RutinaForm';
 import OrdenDetalleModal from './OrdenDetalleModal';
 import OrdenCorrectivaForm from './OrdenCorrectivaForm';
+import { useUsuarioMantenimiento } from './usuarioMantenimiento';
 import EstadoOT from './EstadoOT';
 import { DuplicarEquipoModal, SolapaSubEquipos } from './SubEquipos';
 import type { Equipo, Intervencion, Medicion, RepuestoCritico, RutinaPreventiva, TipoMantenimiento } from './tipos';
@@ -71,6 +74,31 @@ export default function FichaEquipoModal({ equipoId, onClose, onAbrir, esAdmin }
     >
       {ficha && <Contenido ficha={ficha} solapa={solapa} setSolapa={setSolapa} esAdmin={esAdmin} onEliminado={cerrar} onAbrir={id => { setSolapa('datos'); onAbrir(id); }} />}
     </Modal>
+  );
+}
+
+/**
+ * La misma ficha, pero como pantalla completa (en lugar de la lista de equipos, con el menú a la izquierda).
+ * Arriba lleva un botón para volver a donde se estaba. Pedido del encargado: "que aparezca una pantalla".
+ */
+export function FichaEquipoPantalla({ equipoId, onVolver, textoVolver, onAbrir, esAdmin }: { equipoId: string; onVolver: () => void; textoVolver: string; onAbrir: (equipoId: string) => void; esAdmin: boolean }) {
+  const ficha = useFichaEquipo(equipoId);
+  const [solapa, setSolapa] = useState<Solapa>('datos');
+
+  // Cada equipo se abre desde arriba (y en la solapa Datos: quien la usa le pone key={equipoId}).
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [equipoId]);
+
+  if (!ficha) return null;
+  return (
+    <div className="mt-pantalla-equipo">
+      <button type="button" className="mt-volver" onClick={onVolver}><Icono n="volver" /> {textoVolver}</button>
+      <div className="section-header">
+        <h2 className="section-title"><Icono n="herramienta" /> {ficha.equipo.nombre} <span className="mt-card-codigo">{ficha.equipo.codigo}</span></h2>
+      </div>
+      <Contenido ficha={ficha} solapa={solapa} setSolapa={setSolapa} esAdmin={esAdmin} onEliminado={onVolver} onAbrir={onAbrir} />
+    </div>
   );
 }
 
@@ -158,6 +186,7 @@ function SolapaDatos({ ficha, esAdmin, onEliminado, onAbrir }: { ficha: Ficha; e
         <Dato label="Horas de mantenimiento" valor={horas ? String(horas) : '0'} />
         <Dato label="Notas" valor={e.notas} ancho />
       </div>
+      <CostosEquipo equipo={e} subEquipos={ficha.subEquipos} esAdmin={esAdmin} />
       <div className="mt-qr">
         <img src={qr} alt={`Código QR del equipo ${e.codigo}`} />
         <div style={{ fontSize: 12, color: 'var(--text-mid)' }}>
@@ -226,7 +255,7 @@ function SolapaHistorial({ equipoId, intervenciones: propias, intervencionesSub,
   }, [intervenciones, tipo, desde, hasta, componente, texto, sub]);
   const filtrando = !!(texto || desde || hasta || componente);
   const horas = lista.reduce((t, i) => t + (i.horas ?? 0), 0);
-  const parada = lista.reduce((t, i) => t + (i.correctivo?.horasParada ?? 0), 0);
+  const parada = lista.reduce((t, i) => { const h = horasParadaDe(i); return t + h.correctivo + h.preventivo; }, 0);
   const repuestos = lista.reduce((t, i) => t + i.repuestos.reduce((u, r) => u + r.cantidad, 0), 0);
 
   function alternar(id: string) {
@@ -299,7 +328,7 @@ function SolapaHistorial({ equipoId, intervenciones: propias, intervencionesSub,
                 <div className="mt-fila-sub">
                   {[
                     i.realizadoPor && `Por ${i.realizadoPor}`, i.horas != null && `${i.horas} h`,
-                    c?.horasParada != null && `${c.horasParada} h parado`,
+                    (c?.horasParada ?? i.horasParada) != null && `${c?.horasParada ?? i.horasParada} h parado`,
                     i.tareas.length > 1 && `${hechas} de ${i.tareas.length} tareas`,
                     i.repuestos.length > 0 && `${i.repuestos.length} ${i.repuestos.length === 1 ? 'repuesto' : 'repuestos'}`,
                   ].filter(Boolean).join(' · ')}
@@ -313,7 +342,7 @@ function SolapaHistorial({ equipoId, intervenciones: propias, intervencionesSub,
                 {c && (
                   <>
                     <div><h4>Causa</h4>{c.causa || '—'}</div>
-                    <div><h4>Solución</h4>{c.solucion || '—'}</div>
+                    <div><h4>Trabajo realizado</h4><span style={{ whiteSpace: 'pre-wrap' }}>{c.solucion || '—'}</span></div>
                   </>
                 )}
                 {i.tareas.length > 0 && (
@@ -322,7 +351,7 @@ function SolapaHistorial({ equipoId, intervenciones: propias, intervencionesSub,
                     <ul className="mt-hist-tareas">
                       {i.tareas.map((t, k) => (
                         <li key={k} className={t.hecha ? (fueraDeRango(t.medicion, t.valor) ? 'no' : '') : 'no'}>
-                          <Icono n={t.hecha ? 'ok' : 'cerrar'} /> {t.texto}{!t.hecha && ' (no se hizo)'}
+                          <Icono n={t.hecha ? 'ok' : 'cerrar'} /> {t.texto}{!t.hecha && ' (NO)'}
                           {t.medicion && t.valor != null && <strong>: {numeroCorto(t.valor)} {t.medicion.unidad}{fueraDeRango(t.medicion, t.valor) && ` (fuera de rango: ${textoRango(t.medicion)})`}</strong>}
                         </li>
                       ))}
@@ -330,6 +359,7 @@ function SolapaHistorial({ equipoId, intervenciones: propias, intervencionesSub,
                   </div>
                 )}
                 <DetalleCierre tecnicos={i.tecnicos ?? []} liberacion={i.liberacion ?? null} />
+                {(i.revisadoPor || i.aprobadoPor) && <div style={{ fontSize: 12, color: 'var(--text-mid)' }}>{[i.revisadoPor && `Revisó: ${i.revisadoPor}`, i.aprobadoPor && `Aprobó: ${i.aprobadoPor}`].filter(Boolean).join(' · ')}</div>}
                 {(i.repuestos.length > 0 || i.repuestosUsados) && (
                   <div>
                     <h4>Repuestos usados</h4>
@@ -532,13 +562,14 @@ function SolapaPreventivo({ equipoId, rutinas, ordenes, esAdmin }: { equipoId: s
   const [rutinaForm, setRutinaForm] = useState<RutinaPreventiva | 'nueva' | null>(null);
   const [otAbierta, setOtAbierta] = useState<string | null>(null);
   const [correctivaOpen, setCorrectivaOpen] = useState(false);
+  const usuario = useUsuarioMantenimiento();
   const abiertas = ordenes.filter(o => o.estado !== 'terminada').sort((a, b) => a.fechaProgramada.localeCompare(b.fechaProgramada));
 
   return (
     <div>
       <div className="mt-acciones">
         {esAdmin && <Button variant="primary" size="sm" onClick={() => setRutinaForm('nueva')}><Icono n="mas" /> Nueva rutina</Button>}
-        <Button variant="ghost" size="sm" onClick={() => setCorrectivaOpen(true)}><Icono n="herramienta" /> Nueva OT correctiva</Button>
+        {usuario.esTecnico && <Button variant="ghost" size="sm" onClick={() => setCorrectivaOpen(true)}><Icono n="herramienta" /> Cargar OT correctiva</Button>}
       </div>
 
       <div className="mt-bloque-titulo" style={{ marginTop: 4 }}>Órdenes de trabajo abiertas</div>
@@ -574,7 +605,7 @@ function SolapaPreventivo({ equipoId, rutinas, ordenes, esAdmin }: { equipoId: s
       ))}
 
       <RutinaForm open={!!rutinaForm} onClose={() => setRutinaForm(null)} rutina={rutinaForm === 'nueva' ? null : rutinaForm} equipoId={equipoId} personas={personas} />
-      <OrdenCorrectivaForm open={correctivaOpen} onClose={() => setCorrectivaOpen(false)} equipoId={equipoId} personas={personas} />
+      <OrdenCorrectivaForm open={correctivaOpen} onClose={() => setCorrectivaOpen(false)} equipoId={equipoId} />
       <OrdenDetalleModal ordenId={otAbierta} onClose={() => setOtAbierta(null)} esAdmin={esAdmin} personas={personas} />
     </div>
   );

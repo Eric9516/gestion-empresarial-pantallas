@@ -1,4 +1,5 @@
 import { normalizar } from './buscador';
+import { NOMBRE_ETAPA } from './flujo';
 import { esFechaValida } from './fechas';
 import { horasDeTecnico, listaDeTareas, marcasDe, numeroCorto, tareasDePlanilla, textoRepuestos } from './preventivo';
 import type { DatosMantenimiento, DetalleCorrectivo, Liberacion, TrabajoTecnico, Medicion, PlanillaTareas, TareaRegistrada, Equipo, FechaISO, Intervencion, OrdenTrabajo, RepuestoCritico, RutinaPreventiva } from './tipos';
@@ -27,7 +28,7 @@ export const COLUMNAS = {
   repuestos: ['Código equipo', 'Código repuesto', 'Descripción', 'Cantidad', 'Nota'],
   planillas: ['Planilla', 'Tarea', 'Unidad', 'Mínimo', 'Máximo'],
   rutinas: ['Código equipo', 'Planilla', 'Tarea', 'Cada (días)', 'Próxima fecha', 'Avisar (días antes)', 'Responsable', 'Activa', 'Repuestos'],
-  ordenes: ['Número', 'Tipo', 'Código equipo', 'Equipo', 'Fecha programada', 'Tareas', 'Tareas hechas', 'Asignado a', 'Estado', 'Fecha de cierre', 'Horas', 'Repuestos', 'Prioridad', 'Falla', 'Causa', 'Solución', 'Horas de parada', 'Observaciones'],
+  ordenes: ['Número', 'Tipo', 'Código equipo', 'Equipo', 'Fecha programada', 'Tareas', 'Tareas hechas', 'Asignado a', 'Estado', 'Etapa', 'Fecha de cierre', 'Horas', 'Repuestos', 'Prioridad', 'Falla', 'Causa', 'Solución', 'Horas de parada', 'Observaciones'],
   manuales: ['Código equipo', 'Archivo', 'Subido el'],
 } as const;
 
@@ -92,7 +93,7 @@ export function armarHojas(datos: DatosMantenimiento): Record<string, Tabla> {
       [...COLUMNAS.historial],
       ...porEquipoYFecha(datos.intervenciones, i => i.fecha).map(i => [
         cod(i.equipoId), fechaParaExcel(i.fecha), i.tipo === 'correctivo' ? 'Correctivo' : 'Preventivo', i.otNumero ?? '', i.descripcion, i.realizadoPor, i.horas ?? '', textoTecnicos(i.tecnicos ?? []),
-        [textoRepuestos(i.repuestos), i.repuestosUsados].filter(Boolean).join('; '), textoMediciones(i.tareas), ...columnasCorrectivo(i.correctivo),
+        [textoRepuestos(i.repuestos), i.repuestosUsados].filter(Boolean).join('; '), textoMediciones(i.tareas), ...columnasCorrectivo(i.correctivo, i.horasParada),
         textoLiberacion(i.liberacion ?? null),
       ]),
     ],
@@ -116,9 +117,9 @@ export function armarHojas(datos: DatosMantenimiento): Record<string, Tabla> {
       [...COLUMNAS.ordenes],
       ...[...datos.ordenes].sort((a, b) => a.numero.localeCompare(b.numero)).map(o => [
         o.numero, o.tipo === 'preventiva' ? 'Preventiva' : 'Correctiva', cod(o.equipoId), codigo.get(o.equipoId)?.nombre ?? '',
-        fechaParaExcel(o.fechaProgramada), o.tareas, resumenMarcas(o), o.asignadoA, ESTADOS_OT[o.estado], fechaParaExcel(o.fechaCierre), o.horas ?? '',
+        fechaParaExcel(o.fechaProgramada), o.tareas, resumenMarcas(o), o.asignadoA, ESTADOS_OT[o.estado], NOMBRE_ETAPA[o.etapa] ?? '', fechaParaExcel(o.fechaCierre), o.horas ?? '',
         [textoRepuestos(o.estado === 'terminada' ? o.repuestos.map(r => ({ ...r, cantidad: r.usado ?? r.cantidad })).filter(r => r.cantidad > 0) : o.repuestos), o.repuestosUsados].filter(Boolean).join('; '),
-        ...columnasCorrectivo(o.correctivo), o.observaciones,
+        ...columnasCorrectivo(o.correctivo, o.horasParada), o.observaciones,
       ]),
     ],
     [HOJAS.manuales]: [
@@ -275,8 +276,9 @@ export function textoLiberacion(l: Liberacion | null): string {
   return `${l.controles.map(c => `${c.texto}: ${c.ok ? 'sí' : 'no'}`).join('; ')}${l.recibio ? ` · Recibió: ${l.recibio}` : ''}`;
 }
 
-function columnasCorrectivo(c: DetalleCorrectivo | null): (string | number)[] {
-  if (!c) return ['', '', '', '', ''];
+/** En los preventivos solo va la columna "Horas de parada" (la de las paradas del preventivo). */
+function columnasCorrectivo(c: DetalleCorrectivo | null, paradaPreventivo?: number | null): (string | number)[] {
+  if (!c) return ['', '', '', '', paradaPreventivo ?? ''];
   return [c.prioridad === 'urgente' ? 'Urgente' : 'Normal', c.falla, c.causa, c.solucion, c.horasParada ?? ''];
 }
 
@@ -415,6 +417,7 @@ export function analizarLibro(libro: Record<string, Tabla>, actual: DatosManteni
           prioridad: normalizar(texto(v['Prioridad'])).startsWith('urg') ? 'urgente' : 'normal',
           falla: texto(v['Falla']), causa: texto(v['Causa']), solucion: texto(v['Solución']), horasParada: numero(v['Horas de parada']),
         } : null,
+        horasParada: tipo === 'preventivo' ? numero(v['Horas de parada']) : null,
       });
     }
   }

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
-import { crearDatosDemo } from './datosDemo';
-import { aplicarPlanillas, configInicial, sincronizarOrdenes } from './preventivo';
-import type { DatosMantenimiento } from './tipos';
+import { crearDatosDemo, PERSONAS } from './datosDemo';
+import { aplicarPlanillas, configInicial, normalizarHorario, sincronizarOrdenes } from './preventivo';
+import type { DatosMantenimiento, EtapaOT, OrdenTrabajo } from './tipos';
 
 // MODO DE EJEMPLO: guarda los datos del módulo en este navegador (no en la base).
 // Lo usan solo los hooks use*.ts de esta carpeta. Cuando exista la base de datos, esos hooks
@@ -13,6 +13,17 @@ const CLAVE = 'mantenimiento-demo-v3';
 
 export function nuevoId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function etapaVieja(o: OrdenTrabajo): EtapaOT {
+  if (o.estado === 'terminada') return 'aprobada';
+  if (o.tipo === 'preventiva' && o.estado === 'pendiente') return 'por_derivar';
+  return o.asignadoA ? 'asignada' : 'por_asignar';
+}
+
+function asignadosPorNombre(nombres: string): string[] {
+  return nombres.split(/[,;]/).map(n => n.trim().toLowerCase()).filter(Boolean)
+    .map(n => PERSONAS.find(p => p.nombre.toLowerCase() === n)?.id).filter((x): x is string => !!x);
 }
 
 function leerGuardado(): DatosMantenimiento | null {
@@ -29,13 +40,17 @@ function leerGuardado(): DatosMantenimiento | null {
       ordenSectores: datos.ordenSectores ?? [],
       consumos: datos.consumos ?? [],
       planillas: datos.planillas ?? [],
-      config: { ...configInicial(), ...(datos.config ?? {}) },
+      gastosExternos: datos.gastosExternos ?? [],
+      config: { ...configInicial(), ...(datos.config ?? {}), horarioRecepcion: normalizarHorario(datos.config?.horarioRecepcion) },
+      personas: datos.personas?.length ? datos.personas : PERSONAS,
       equipos: datos.equipos.map(e => ({ ...e, padreId: e.padreId ?? null, subsector: e.subsector ?? '' })),
       intervenciones: datos.intervenciones.map(i => ({ ...i, repuestos: i.repuestos ?? [], tareas: i.tareas ?? [], correctivo: i.correctivo ?? null, otNumero: i.otNumero ?? null, tecnicos: i.tecnicos ?? [], liberacion: i.liberacion ?? null })),
       rutinas: datos.rutinas.map(r => ({ ...r, repuestos: r.repuestos ?? [], planillaId: r.planillaId ?? null, mediciones: r.mediciones ?? [] })),
       ordenes: datos.ordenes.map(o => ({
         ...o, tareasHechas: o.tareasHechas ?? [], repuestos: o.repuestos ?? [], mediciones: o.mediciones ?? [], valores: o.valores ?? [], tecnicos: o.tecnicos ?? [], liberacion: o.liberacion ?? null,
         correctivo: o.correctivo ?? (o.tipo === 'correctiva' ? { prioridad: 'normal', falla: '', causa: '', solucion: '', horasParada: null } : null),
+        // OT guardadas antes del circuito derivar → asignar → revisar → aprobar.
+        etapa: o.etapa ?? etapaVieja(o), asignados: o.asignados ?? asignadosPorNombre(o.asignadoA), pasos: o.pasos ?? [], terminadaEn: o.terminadaEn ?? null, cierre: o.cierre ?? null,
       })),
     };
   } catch {
@@ -76,7 +91,7 @@ export function actualizarDatos(cambio: (d: DatosMantenimiento) => DatosMantenim
 
 /** Deja el módulo vacío, para cargar o importar solo datos propios (en este navegador). */
 export function vaciarDatosDemo() {
-  actualizarDatos(() => ({ sectores: [], subsectores: [], ordenSectores: [], equipos: [], intervenciones: [], repuestosCriticos: [], manuales: [], rutinas: [], ordenes: [], consumos: [], planillas: [], config: configInicial() }));
+  actualizarDatos(() => ({ sectores: [], subsectores: [], ordenSectores: [], equipos: [], intervenciones: [], repuestosCriticos: [], manuales: [], rutinas: [], ordenes: [], consumos: [], planillas: [], gastosExternos: [], config: configInicial(), personas: PERSONAS }));
 }
 
 /** Vuelve a los datos de ejemplo del principio (borra lo cargado en este navegador). */

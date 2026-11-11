@@ -42,6 +42,13 @@
   .menu-lateral-texto { opacity: 0; transition: opacity 0.15s; }
   .menu-lateral.abierto .menu-lateral-texto { opacity: 1; }
 
+  /* Flechita de los ítems con sub-menú (gira al desplegarse) y los ítems del sub-menú, con sangría. */
+  .menu-lateral-flecha { display: inline-flex; margin-left: auto; font-size: 16px; color: var(--text-muted); opacity: 0; transition: opacity 0.15s, transform 0.15s; }
+  .menu-lateral.abierto .menu-lateral-flecha { opacity: 1; }
+  .menu-lateral-flecha.desplegada { transform: rotate(90deg); }
+  .menu-lateral-item.sub { height: 34px; padding-left: 42px; font-size: 13px; font-weight: 600; }
+  .menu-lateral-item.sub .menu-lateral-icono { display: none; }
+
   .menu-lateral-cant {
     position: absolute; top: 2px; left: 22px; min-width: 16px; height: 16px; padding: 0 4px;
     border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center;
@@ -68,5 +75,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .menu-lateral, .menu-lateral-texto, .menu-lateral-grupo span, .menu-lateral-grupo::after { transition: none; }
+  .menu-lateral, .menu-lateral-texto, .menu-lateral-flecha, .menu-lateral-grupo span, .menu-lateral-grupo::after { transition: none; }
 }
