@@ -3,13 +3,9 @@ import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { generarRotuloBlob, generarRotuloGrupoBlob } from '../../lib/generarRotuloPdf';
 import { abrirPdfBlob } from '../../lib/pdfBlob';
-import { registrarErrorAccion } from '../../lib/errorLogging';
-import { publicUrl } from '../../lib/storage';
-import { useComisionistasQuery } from '../comisionistas/useComisionistas';
-import { useProveedoresQuery } from '../proveedores/useProveedores';
-import { useRotuloParaEditarQuery } from './useRotulos';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeEnvios, type BultoDeEnvio } from './servicioDeEnvios';
 import { Button } from '@/components/ui/button';
-import { useModulos } from '../config/useModulos';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
@@ -20,10 +16,12 @@ interface Props {
 }
 
 export default function RotuloBultosModal({ open, onClose, rotuloId }: Props) {
-  const { data: editData, isLoading, isError } = useRotuloParaEditarQuery(rotuloId);
-  const { data: proveedores } = useProveedoresQuery();
-  const { data: comisionistas } = useComisionistasQuery();
-  const { integ } = useModulos();
+  const { proveedores, comisionistas, conComisionistas, leerEnvio, registrarError } = useServicioDeEnvios();
+  // se vuelve a pedir cada vez que se abre (el comentario pudo cambiar)
+  const pedido = usePedido(open && rotuloId ? rotuloId : null, () => leerEnvio(rotuloId!));
+  const editData = pedido.data;
+  const isLoading = pedido.cargando && !editData;
+  const isError = !!pedido.error;
   const toast = useToast();
   const [generandoTodos, setGenerandoTodos] = useState(false);
 
@@ -39,7 +37,7 @@ export default function RotuloBultosModal({ open, onClose, rotuloId }: Props) {
     },
     { etiqueta: 'Fecha', valor: new Date(rotulo.created_at).toLocaleDateString('es-AR') },
     { etiqueta: 'Proveedor', valor: proveedor?.nombre ?? '(proveedor eliminado)' },
-    ...(integ.enviosConComisionistas ? [{ etiqueta: 'Comisionista', valor: comisionista ? (comisionista.empresa || comisionista.nombre || '—') : 'Sin comisionista' }] : []),
+    ...(conComisionistas ? [{ etiqueta: 'Comisionista', valor: comisionista ? (comisionista.empresa || comisionista.nombre || '—') : 'Sin comisionista' }] : []),
     ...(rotulo.valor_declarado ? [{ etiqueta: 'Valor declarado', valor: rotulo.valor_declarado }] : []),
   ] : [];
 
@@ -51,14 +49,14 @@ export default function RotuloBultosModal({ open, onClose, rotuloId }: Props) {
 
   // Los rótulos viejos tienen el PDF ya guardado (storage_path real); los
   // que se crean de acá en adelante no guardan archivo — se arman al toque.
-  async function verPdf(b: { numero: number; detalle: string | null; storage_path: string | null }) {
-    if (b.storage_path) { window.open(publicUrl('rotulos', b.storage_path), '_blank'); return; }
+  async function verPdf(b: BultoDeEnvio) {
+    if (b.url) { window.open(b.url, '_blank'); return; }
     if (!rotulo || !proveedor) return;
     try {
       const blob = await generarRotuloBlob(rotulo, b, proveedor, proveedor.contactos);
       abrirPdfBlob(blob);
     } catch (err) {
-      await registrarErrorAccion('Error al generar el PDF de un rótulo', err);
+      await registrarError('Error al generar el PDF de un rótulo', err);
       toast('No se pudo generar el PDF: ' + mensajeDeError(err), 'error');
     }
   }
@@ -70,7 +68,7 @@ export default function RotuloBultosModal({ open, onClose, rotuloId }: Props) {
       const blob = await generarRotuloGrupoBlob(rotulo, bultos, proveedor, proveedor.contactos);
       abrirPdfBlob(blob);
     } catch (err) {
-      await registrarErrorAccion('Error al generar el PDF combinado de un envío', err);
+      await registrarError('Error al generar el PDF combinado de un envío', err);
       toast('No se pudo generar el PDF: ' + mensajeDeError(err), 'error');
     } finally {
       setGenerandoTodos(false);

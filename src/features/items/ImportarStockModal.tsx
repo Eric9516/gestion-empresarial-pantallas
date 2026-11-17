@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
-import { analizarExcelStock, useAplicarImportacionStock, type AnalisisImportacion } from './useImportarStock';
+import { useServicioDeConfiguracion } from '../admin/servicioDeConfiguracion';
+import { analizarExcelStock, filasAImportar, type AnalisisImportacion } from './importarStock';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 
 export default function ImportarStockModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toast = useToast();
-  const aplicar = useAplicarImportacionStock();
+  const { repuestos, registrarError } = useServicioDeConfiguracion();
+  const [guardando, setGuardando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [analizando, setAnalizando] = useState(false);
@@ -29,10 +30,10 @@ export default function ImportarStockModal({ open, onClose }: { open: boolean; o
     setAnalizando(true);
     setAnalisis(null);
     try {
-      const resultado = await analizarExcelStock(file);
+      const resultado = await analizarExcelStock(file, await repuestos.datosParaImportarStock());
       setAnalisis(resultado);
     } catch (err) {
-      await registrarErrorAccion('Error al leer el Excel de stock', err);
+      await registrarError('Error al leer el Excel de stock', err);
       toast('No se pudo leer el archivo. Verificá que sea el Excel correcto.', 'error');
     } finally {
       setAnalizando(false);
@@ -41,13 +42,16 @@ export default function ImportarStockModal({ open, onClose }: { open: boolean; o
 
   async function handleConfirmar() {
     if (!analisis) return;
+    setGuardando(true);
     try {
-      await aplicar.mutateAsync([...analisis.nuevos, ...analisis.modificados]);
+      await repuestos.importarStock(filasAImportar([...analisis.nuevos, ...analisis.modificados]));
       toast(`Listo: ${analisis.nuevos.length} nuevos, ${analisis.modificados.length} actualizados.`, 'success');
       handleClose();
     } catch (err) {
-      await registrarErrorAccion('Error al guardar la importación de stock', err);
+      await registrarError('Error al guardar la importación de stock', err);
       toast('Error al guardar los cambios en la base.', 'error');
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -63,10 +67,10 @@ export default function ImportarStockModal({ open, onClose }: { open: boolean; o
             <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
             <Button
               variant="success"
-              disabled={aplicar.isPending || (analisis.nuevos.length === 0 && analisis.modificados.length === 0)}
+              disabled={guardando || (analisis.nuevos.length === 0 && analisis.modificados.length === 0)}
               onClick={handleConfirmar}
             >
-              {aplicar.isPending ? 'Guardando...' : <><Icono n="exito" /> Confirmar carga ({analisis.nuevos.length + analisis.modificados.length})</>}
+              {guardando ? 'Guardando...' : <><Icono n="exito" /> Confirmar carga ({analisis.nuevos.length + analisis.modificados.length})</>}
             </Button>
           </>
         ) : (
@@ -82,7 +86,7 @@ export default function ImportarStockModal({ open, onClose }: { open: boolean; o
             Se toma la columna V como código, W como descripción, S como stock, B como stock
             mínimo y C como punto de pedido. La fila 1 se asume encabezado. El código se cruza
             contra el del sistema: si ya existe, se actualizan stock, descripción, mínimo y punto de
-            pedido; si no existe, se da de alta como repuesto nuevo.
+            pedido; si no existe, se da de alta como artículo nuevo.
           </p>
         </div>
       )}

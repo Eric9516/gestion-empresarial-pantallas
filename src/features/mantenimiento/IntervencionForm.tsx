@@ -3,10 +3,8 @@ import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { fechaHoyISO } from '../../lib/fechaHoy';
 import { mensajeDeError } from '../../lib/errores';
-import { useComponentesDeEquipo, useRegistrarIntervencion } from './useEquipos';
-import RepuestosEditor from './RepuestosEditor';
-import { limpiarLineas } from './repuestos';
-import type { Intervencion, Prioridad, RepuestoLinea, TipoMantenimiento } from './tipos';
+import { useMantenimiento } from './servicio';
+import type { Intervencion, Prioridad, TipoMantenimiento } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,11 +16,10 @@ interface Props {
   equipoId: string;
   /** Para editar una entrada existente. */
   intervencion?: Intervencion | null;
-  /** Sugerencias para "Realizado por". */
-  personas: string[];
 }
 
-// Registrar en el historial algo que se hizo en el equipo (correctivo o preventivo).
+// Registrar en el historial algo que se hizo en el equipo, correctivo o preventivo (del diseño del socio). Quiénes lo hicieron se eligen de
+// los técnicos de Mantenimiento. (Los repuestos que descuentan stock llegan con la etapa 2, junto con las órdenes de trabajo.)
 export default function IntervencionForm(props: Props) {
   return (
     <Modal open={props.open} onClose={props.onClose} title={<><Icono n="historial" /> {props.intervencion ? 'Editar registro' : 'Registrar mantenimiento'}</>}>
@@ -31,27 +28,26 @@ export default function IntervencionForm(props: Props) {
   );
 }
 
-function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
+function Formulario({ onClose, equipoId, intervencion }: Props) {
   const uid = useId();
   const toast = useToast();
-  const guardar = useRegistrarIntervencion();
+  const s = useMantenimiento();
   const [tipo, setTipo] = useState<TipoMantenimiento>(intervencion?.tipo ?? 'correctivo');
   const [fecha, setFecha] = useState(intervencion?.fecha ?? fechaHoyISO());
   const [descripcion, setDescripcion] = useState(intervencion?.descripcion ?? '');
-  const [realizadoPor, setRealizadoPor] = useState(intervencion?.realizadoPor ?? '');
+  const [tecnicos, setTecnicos] = useState<string[]>(intervencion?.tecnicos.flatMap(t => (t.id ? [t.id] : [])) ?? []);
   const [horas, setHoras] = useState(intervencion?.horas != null ? String(intervencion.horas) : '');
-  const [repuestosTexto, setRepuestosTexto] = useState(intervencion?.repuestosUsados ?? '');
-  const [lineas, setLineas] = useState<RepuestoLinea[]>(intervencion?.repuestos ?? []);
-  const [descontar, setDescontar] = useState(true);
+  const [repuestos, setRepuestos] = useState(intervencion?.repuestosUsados ?? '');
   const c = intervencion?.correctivo;
   const [prioridad, setPrioridad] = useState<Prioridad>(c?.prioridad ?? 'normal');
   const [falla, setFalla] = useState(c?.falla ?? '');
   const [causa, setCausa] = useState(c?.causa ?? '');
   const [solucion, setSolucion] = useState(c?.solucion ?? '');
-  const paradaGuardada = c?.horasParada ?? intervencion?.horasParada ?? null;
-  const [parada, setParada] = useState(paradaGuardada != null ? String(paradaGuardada) : '');
-  const componentes = useComponentesDeEquipo(intervencion?.equipoId ?? equipoId);
-  const nueva = !intervencion;
+  // las horas de equipo parado, también en los preventivos (para la disponibilidad)
+  const [parada, setParada] = useState(intervencion?.horasParada != null ? String(intervencion.horasParada) : '');
+  const [guardando, setGuardando] = useState(false);
+  // los que figuran en el registro y ya no son técnicos (o se borraron) se siguen viendo, sin poder elegirse de nuevo
+  const otros = (intervencion?.tecnicos ?? []).filter(t => !t.id || !s.tecnicos.some(x => x.id === t.id));
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -60,22 +56,20 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
     if (h != null && (!Number.isFinite(h) || h < 0)) { toast('Las horas tienen que ser un número.', 'error'); return; }
     const hp = parada.trim() ? Number(parada.replace(',', '.')) : null;
     if (hp != null && (!Number.isFinite(hp) || hp < 0)) { toast('Las horas de parada tienen que ser un número.', 'error'); return; }
-    const usados = limpiarLineas(lineas).filter(l => l.cantidad > 0).map(l => ({ ...l, usado: l.cantidad }));
+    setGuardando(true);
     try {
-      await guardar.mutateAsync({
-        id: intervencion?.id, equipoId: intervencion?.equipoId ?? equipoId, fecha, tipo, descripcion: descripcion.trim(), realizadoPor: realizadoPor.trim(),
-        horas: h, repuestosUsados: repuestosTexto.trim(), otId: intervencion?.otId ?? null,
-        repuestos: usados, tareas: intervencion?.tareas ?? [], otNumero: intervencion?.otNumero ?? null,
-        tecnicos: intervencion?.tecnicos ?? [], liberacion: intervencion?.liberacion ?? null,
+      await s.guardarIntervencion({
+        id: intervencion?.id ?? null, equipoId: intervencion?.equipoId ?? equipoId, fecha, tipo, descripcion: descripcion.trim(),
+        tecnicos: [...tecnicos, ...otros.flatMap(t => (t.id ? [t.id] : []))], horas: h, repuestosUsados: repuestos.trim(),
         correctivo: tipo === 'correctivo' ? { prioridad, falla: falla.trim(), causa: causa.trim(), solucion: solucion.trim(), horasParada: hp } : null,
         horasParada: tipo === 'preventivo' ? hp : null,
-        descontarStock: nueva && descontar,
       });
-      const descontados = nueva && descontar ? usados.filter(l => l.codigo).length : 0;
-      toast(descontados ? `Guardado en el historial. Se descontaron ${descontados === 1 ? '1 repuesto' : `${descontados} repuestos`} del stock.` : 'Guardado en el historial', 'success');
+      toast('Guardado en el historial', 'success');
       onClose();
     } catch (err) {
       toast(mensajeDeError(err), 'error');
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -91,20 +85,34 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
       <div className="form-grid">
         <div className="form-group">
           <label htmlFor={`${uid}-f`}>Fecha</label>
-          <Input id={`${uid}-f`} type="date" value={fecha} onChange={e => setFecha(e.target.value)} required />
-        </div>
-        <div className="form-group">
-          <label htmlFor={`${uid}-p`}>Realizado por</label>
-          <Input id={`${uid}-p`} list={`${uid}-personas`} value={realizadoPor} onChange={e => setRealizadoPor(e.target.value)} />
-          <datalist id={`${uid}-personas`}>{personas.map(p => <option key={p} value={p} />)}</datalist>
-        </div>
-        <div className="form-group full">
-          <label htmlFor={`${uid}-d`}>Qué se hizo *</label>
-          <Textarea id={`${uid}-d`} data-autofocus value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Falla encontrada y trabajo realizado" />
+          <Input id={`${uid}-f`} type="date" value={fecha} max={fechaHoyISO()} onChange={e => setFecha(e.target.value)} required />
         </div>
         <div className="form-group">
           <label htmlFor={`${uid}-h`}>Horas de trabajo</label>
           <Input id={`${uid}-h`} inputMode="decimal" value={horas} onChange={e => setHoras(e.target.value)} placeholder="Ej.: 1,5" />
+        </div>
+        <fieldset className="form-group full" style={{ border: 'none', padding: 0, margin: 0 }}>
+          <legend style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Realizado por</legend>
+          {s.tecnicos.length || otros.length ? (
+            <div className="mt-chips" style={{ flexWrap: 'wrap', marginBottom: 0 }}>
+              {s.tecnicos.map(t => {
+                const elegido = tecnicos.includes(t.id);
+                return (
+                  <button key={t.id} type="button" aria-pressed={elegido} className={`mt-chip${elegido ? ' activo' : ''}`}
+                    onClick={() => setTecnicos(v => (elegido ? v.filter(x => x !== t.id) : [...v, t.id]))}>
+                    {elegido && <Icono n="ok" />}{t.nombre}
+                  </button>
+                );
+              })}
+              {otros.map(t => <span key={t.nombre} className="mt-tag">{t.nombre}</span>)}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Todavía no hay técnicos: un dueño les da el rol en Configuración → Usuarios.</div>
+          )}
+        </fieldset>
+        <div className="form-group full">
+          <label htmlFor={`${uid}-d`}>Qué se hizo *</label>
+          <Textarea id={`${uid}-d`} data-autofocus value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Falla encontrada y trabajo realizado" maxLength={4000} />
         </div>
         <div className="form-group">
           <label htmlFor={`${uid}-hp`}>Horas de equipo parado</label>
@@ -112,9 +120,9 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
         </div>
         {tipo === 'correctivo' && (
           <>
-            <div className="form-group full">
-              <label>Prioridad</label>
-              <div className="mt-chips" role="radiogroup" aria-label="Prioridad" style={{ marginBottom: 0 }}>
+            <div className="form-group">
+              <label id={`${uid}-pr`}>Prioridad</label>
+              <div className="mt-chips" role="radiogroup" aria-labelledby={`${uid}-pr`} style={{ marginBottom: 0 }}>
                 {(['normal', 'urgente'] as const).map(p => (
                   <button key={p} type="button" role="radio" aria-checked={prioridad === p} className={`mt-chip${prioridad === p ? ' activo' : ''}${p === 'urgente' ? ' alerta' : ''}`} onClick={() => setPrioridad(p)}>
                     {p === 'urgente' ? 'Urgente' : 'Normal'}
@@ -124,39 +132,26 @@ function Formulario({ onClose, equipoId, intervencion, personas }: Props) {
             </div>
             <div className="form-group full">
               <label htmlFor={`${uid}-fa`}>Falla</label>
-              <Textarea id={`${uid}-fa`} rows={2} value={falla} onChange={e => setFalla(e.target.value)} placeholder="Qué se vio o qué avisaron" />
+              <Textarea id={`${uid}-fa`} rows={2} value={falla} onChange={e => setFalla(e.target.value)} placeholder="Qué se vio o qué avisaron" maxLength={4000} />
             </div>
             <div className="form-group full">
               <label htmlFor={`${uid}-ca`}>Causa</label>
-              <Textarea id={`${uid}-ca`} rows={2} value={causa} onChange={e => setCausa(e.target.value)} placeholder="Por qué pasó" />
+              <Textarea id={`${uid}-ca`} rows={2} value={causa} onChange={e => setCausa(e.target.value)} placeholder="Por qué pasó" maxLength={4000} />
             </div>
             <div className="form-group full">
               <label htmlFor={`${uid}-so`}>Solución</label>
-              <Textarea id={`${uid}-so`} rows={2} value={solucion} onChange={e => setSolucion(e.target.value)} placeholder="Qué se hizo para arreglarlo" />
+              <Textarea id={`${uid}-so`} rows={2} value={solucion} onChange={e => setSolucion(e.target.value)} placeholder="Qué se hizo para arreglarlo" maxLength={4000} />
             </div>
           </>
         )}
         <div className="form-group full">
-          <label>Repuestos usados</label>
-          <RepuestosEditor lineas={lineas} onChange={setLineas} componentes={componentes} conPrecio />
-          {nueva && lineas.some(l => l.codigo.trim()) && (
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', fontWeight: 700, marginTop: 8 }}>
-              <input type="checkbox" checked={descontar} onChange={e => setDescontar(e.target.checked)} style={{ width: 18, height: 18 }} />
-              Descontarlos del stock del Depósito
-            </label>
-          )}
-          {!nueva && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>Cambiar los repuestos acá no modifica el stock.</div>}
+          <label htmlFor={`${uid}-r`}>Repuestos usados</label>
+          <Input id={`${uid}-r`} value={repuestos} onChange={e => setRepuestos(e.target.value)} placeholder="Ej.: 2 rodamientos YAR 206, 1 sello" maxLength={2000} />
         </div>
-        {repuestosTexto && (
-          <div className="form-group full">
-            <label htmlFor={`${uid}-r`}>Otros repuestos (texto)</label>
-            <Input id={`${uid}-r`} value={repuestosTexto} onChange={e => setRepuestosTexto(e.target.value)} />
-          </div>
-        )}
       </div>
       <div className="modal-footer">
         <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" variant="primary"><Icono n="guardar" /> Guardar</Button>
+        <Button type="submit" variant="primary" disabled={guardando}><Icono n="guardar" /> {guardando ? 'Guardando...' : 'Guardar'}</Button>
       </div>
     </form>
   );

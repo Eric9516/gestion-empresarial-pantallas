@@ -296,30 +296,54 @@ export type Database = {
       }
       equipos: {
         Row: {
+          codigo: string
           created_at: string
-          datos_tecnicos: string | null
+          critico: boolean
+          empresa_id: string
+          etiquetas: string[]
           id: string
-          manual_url: string | null
+          marca: string
+          modelo: string
           nombre: string
-          sector: string
+          notas: string
+          numero_serie: string
+          padre_id: string | null
+          sector_id: string | null
+          ubicacion: string
           updated_at: string
         }
         Insert: {
+          codigo: string
           created_at?: string
-          datos_tecnicos?: string | null
+          critico?: boolean
+          empresa_id?: string
+          etiquetas?: string[]
           id?: string
-          manual_url?: string | null
+          marca?: string
+          modelo?: string
           nombre: string
-          sector: string
+          notas?: string
+          numero_serie?: string
+          padre_id?: string | null
+          sector_id?: string | null
+          ubicacion?: string
           updated_at?: string
         }
         Update: {
+          codigo?: string
           created_at?: string
-          datos_tecnicos?: string | null
+          critico?: boolean
+          empresa_id?: string
+          etiquetas?: string[]
           id?: string
-          manual_url?: string | null
+          marca?: string
+          modelo?: string
           nombre?: string
-          sector?: string
+          notas?: string
+          numero_serie?: string
+          padre_id?: string | null
+          sector_id?: string | null
+          ubicacion?: string
           updated_at?: string
         }
         Relationships: []
@@ -336,6 +360,8 @@ export type Database = {
           nombre: string
           prefijo: string
           punto_venta: number
+          usa_reparaciones: boolean
+          usa_retiros: boolean
         }
         Insert: {
           activo?: boolean
@@ -348,6 +374,8 @@ export type Database = {
           nombre: string
           prefijo: string
           punto_venta?: number
+          usa_reparaciones?: boolean
+          usa_retiros?: boolean
         }
         Update: {
           activo?: boolean
@@ -360,6 +388,8 @@ export type Database = {
           nombre?: string
           prefijo?: string
           punto_venta?: number
+          usa_reparaciones?: boolean
+          usa_retiros?: boolean
         }
         Relationships: []
       }
@@ -490,6 +520,7 @@ export type Database = {
           foto_url_3: string | null
           id: string
           numero: string
+          palabras_clave: string | null
           punto_pedido: number
           stock: number | null
           stock_minimo: number
@@ -523,6 +554,7 @@ export type Database = {
           foto_url_3?: string | null
           id?: string
           numero: string
+          palabras_clave: string | null
           punto_pedido?: number
           stock?: number | null
           stock_minimo?: number
@@ -556,6 +588,7 @@ export type Database = {
           foto_url_3?: string | null
           id?: string
           numero?: string
+          palabras_clave?: string | null
           punto_pedido?: number
           stock?: number | null
           stock_minimo?: number
@@ -829,23 +862,26 @@ export type Database = {
       reparacion_items: {
         Row: {
           cantidad: number
+          descripcion: string | null
           descuenta_stock: boolean
           id: string
-          item_id: string
+          item_id: string | null
           reparacion_id: string
         }
         Insert: {
           cantidad: number
+          descripcion?: string | null
           descuenta_stock?: boolean
           id?: string
-          item_id: string
+          item_id?: string | null
           reparacion_id: string
         }
         Update: {
           cantidad?: number
+          descripcion?: string | null
           descuenta_stock?: boolean
           id?: string
-          item_id?: string
+          item_id?: string | null
           reparacion_id?: string
         }
         Relationships: [
@@ -1425,9 +1461,15 @@ export type Database = {
           id: string
           last_login_at: string | null
           mantenimiento_rol: string | null
+          rol_equipos: string | null
           nombre: string | null
           puede_ajustar_inventario: boolean
           puede_gestionar_depositos: boolean
+          puede_ver_informe: boolean
+          puede_ver_calendario: boolean
+
+          puede_ver_auditoria: boolean
+          preferencias: Json
           puede_resetear_contrasenas: boolean
           puede_ver_errores: boolean
           puede_ver_retiros: boolean
@@ -1446,9 +1488,15 @@ export type Database = {
           id: string
           last_login_at?: string | null
           mantenimiento_rol?: string | null
+          rol_equipos?: string | null
           nombre?: string | null
           puede_ajustar_inventario?: boolean
           puede_gestionar_depositos?: boolean
+          puede_ver_informe?: boolean
+          puede_ver_calendario?: boolean
+
+          puede_ver_auditoria?: boolean
+          preferencias?: Json
           puede_resetear_contrasenas?: boolean
           puede_ver_errores?: boolean
           puede_ver_retiros?: boolean
@@ -1467,9 +1515,15 @@ export type Database = {
           id?: string
           last_login_at?: string | null
           mantenimiento_rol?: string | null
+          rol_equipos?: string | null
           nombre?: string | null
           puede_ajustar_inventario?: boolean
           puede_gestionar_depositos?: boolean
+          puede_ver_informe?: boolean
+          puede_ver_calendario?: boolean
+
+          puede_ver_auditoria?: boolean
+          preferencias?: Json
           puede_resetear_contrasenas?: boolean
           puede_ver_errores?: boolean
           puede_ver_retiros?: boolean
@@ -1507,11 +1561,15 @@ export type Database = {
           p_icono?: string
           p_nombre: string
           p_prefijo: string
+          p_usa_reparaciones?: boolean
+          p_usa_retiros?: boolean
         }
         Returns: Database['public']['Tables']['depositos']['Row']
       }
       can_gestionar_depositos: { Args: never; Returns: boolean }
+      can_ver_informe: { Args: never; Returns: boolean }
       depositos_del_usuario: { Args: never; Returns: string[] }
+      guardar_preferencias: { Args: { p_cambios: Json }; Returns: Json }
       editar_deposito: {
         Args: {
           p_activo: boolean
@@ -1520,6 +1578,8 @@ export type Database = {
           p_id: string
           p_nombre: string
           p_prefijo?: string | null
+          p_usa_reparaciones?: boolean | null
+          p_usa_retiros?: boolean | null
         }
         Returns: Database['public']['Tables']['depositos']['Row']
       }
@@ -1528,6 +1588,7 @@ export type Database = {
           p_descripcion: string
           p_detalles: string
           p_familia_id: string
+          p_palabras_clave?: string
           p_numero: string
           p_punto_pedido: number
           p_stock: number
@@ -1609,6 +1670,16 @@ export type Database = {
         Args: { p_texto?: string; p_desde?: string; p_hasta?: string; p_usuario?: string; p_antes_en?: string; p_antes_id?: string; p_limite?: number }
         Returns: { id: string; usuario_id: string; created_at: string; observacion_general: string | null; sector: string | null; lineas: Json }[]
       }
+      historial_de_actividad: {
+        Args: { p_usuario?: string; p_deposito?: string; p_sobre?: string[]; p_acciones?: string[]; p_desde?: string; p_hasta?: string; p_texto?: string; p_antes_en?: string; p_antes_id?: number; p_limite?: number }
+        Returns: { id: number; momento: string; usuario_id: string | null; usuario_nombre: string | null; sobre: string; registro_id: string | null; codigo: string | null; titulo: string; deposito_id: string | null; deposito: string | null; accion: string; detalle: string }[]
+      }
+      historial_de_actividad_cantidad: {
+        Args: { p_usuario?: string; p_deposito?: string; p_sobre?: string[]; p_acciones?: string[]; p_desde?: string; p_hasta?: string; p_texto?: string; p_tope?: number }
+        Returns: number
+      }
+      historial_personas: { Args: Record<PropertyKey, never>; Returns: { id: string; nombre: string }[] }
+      historial_depositos: { Args: { p_usuario?: string }; Returns: { id: string; nombre: string }[] }
       lista_de_movimientos: {
         Args: { p_texto?: string; p_filtro?: string; p_desde?: string; p_hasta?: string; p_antes_en?: string; p_antes_id?: string; p_limite?: number }
         Returns: {

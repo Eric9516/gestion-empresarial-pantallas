@@ -1,6 +1,6 @@
 import type { FechaISO } from './tipos';
 
-// Cuentas con fechas yyyy-mm-dd en hora local (sin corrimientos por zona horaria).
+// Cuentas con fechas yyyy-mm-dd en hora local (sin corrimientos por zona horaria). Del diseño del socio.
 
 export function aFecha(iso: FechaISO): Date {
   return new Date(`${iso}T00:00:00`);

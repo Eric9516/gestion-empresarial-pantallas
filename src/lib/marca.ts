@@ -5,7 +5,8 @@
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 export const COLOR_PRIMARIO_ORIGINAL = '#1a3a6b';
-export const COLOR_DEPOSITO_ORIGINAL = '#9a5b12';
+// (los depósitos nacen con el azul de la app, como todo lo demás: pedido del encargado, 05/11/2026)
+export const COLOR_DEPOSITO_ORIGINAL = COLOR_PRIMARIO_ORIGINAL;
 // Lo mínimo para que el texto blanco se lea sobre el color (WCAG AA, texto normal).
 export const CONTRASTE_MINIMO = 4.5;
 
@@ -60,6 +61,24 @@ export function contrasteConBlanco(hex: string): number {
 
 export function textoLegibleConBlanco(hex: string): boolean {
   return contrasteConBlanco(hex) >= CONTRASTE_MINIMO;
+}
+
+/**
+ * Las variables CSS de los colores elegidos, para ponerlas en la pantalla (la app de Next las arma en el servidor). Sin color elegido, no se
+ * pone nada y quedan los de variables.css (el azul). El depósito, si no tiene uno propio, toma el de la empresa.
+ */
+export function variablesDeMarca(marca: { primario?: string | null; deposito?: string | null }): Record<string, string> {
+  const v: Record<string, string> = {};
+  if (esColorValido(marca.primario)) {
+    const p = derivarPaleta(marca.primario);
+    Object.assign(v, { '--blue': p.base, '--blue-mid': p.medio, '--blue-light': p.claro });
+  }
+  const dep = esColorValido(marca.deposito) ? marca.deposito : esColorValido(marca.primario) ? marca.primario : null;
+  if (dep) {
+    const d = derivarPaleta(dep);
+    Object.assign(v, { '--deposito': d.base, '--deposito-mid': d.medio });
+  }
+  return v;
 }
 
 interface Estilable {

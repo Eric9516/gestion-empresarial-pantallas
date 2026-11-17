@@ -4,12 +4,11 @@ import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
 import SizeSelector from '../../components/SizeSelector';
 import { DEFAULT_CAMPOS, DEFAULT_DESIGN, getCurrentCampos, getCurrentDesign, type RotuloCampos, type RotuloDesign } from '../../lib/rotuloDesign';
-import { useConfiguracionQuery } from '../config/useConfiguracion';
 import { NOMBRE_EMPRESA_POR_DEFECTO } from '../../lib/empresa';
 import RotuloPreview from '../rotulos/RotuloPreview';
 import RotuloCamposToggles from '../rotulos/RotuloCamposToggles';
 import RotuloDisenosGuardados from '../rotulos/RotuloDisenosGuardados';
-import { useGuardarComoModelo, useResetRotuloDesign, useSaveRotuloDesign } from '../rotulos/useRotuloDiseno';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -50,10 +49,7 @@ function RangeField({ label, value, min, max, unit = 'px', onChange }: { label: 
 }
 
 export default function RotuloDesignPane() {
-  const { data: config } = useConfiguracionQuery();
-  const saveDesign = useSaveRotuloDesign();
-  const resetDesign = useResetRotuloDesign();
-  const guardarComoModelo = useGuardarComoModelo();
+  const { config, rotulo } = useServicioDeConfiguracion();
   const toast = useToast();
   const confirmar = useConfirm();
 
@@ -75,7 +71,7 @@ export default function RotuloDesignPane() {
 
   async function handleGuardar() {
     try {
-      await saveDesign.mutateAsync({ rotulo_design: rd, rotulo_pie: pie, rotulo_campos: campos });
+      await rotulo.guardar({ rotulo_design: rd, rotulo_pie: pie, rotulo_campos: campos });
       toast('Diseño guardado como predeterminado', 'success');
     } catch {
       toast('Error al guardar diseño', 'error');
@@ -85,7 +81,7 @@ export default function RotuloDesignPane() {
   async function handleReset() {
     if (!(await confirmar('¿Restablecer el diseño original?', { textoConfirmar: 'Restablecer' }))) return;
     try {
-      await resetDesign.mutateAsync();
+      await rotulo.restablecer();
       setRd(DEFAULT_DESIGN);
       toast('Diseño restablecido', 'success');
     } catch {
@@ -197,7 +193,7 @@ export default function RotuloDesignPane() {
 
         <RotuloDisenosGuardados
           disenoActivoId={config?.rotulo_diseno_id ?? null}
-          onGuardarComoModelo={nombre => guardarComoModelo.mutateAsync({ nombre, design: rd, pie, campos })}
+          onGuardarComoModelo={nombre => rotulo.guardarModelo({ nombre, design: rd, pie, campos })}
         />
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18, paddingTop: 16, borderTop: '1.5px solid var(--border)' }}>

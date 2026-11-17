@@ -3,7 +3,8 @@ import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { fechaHoyISO } from '../../lib/fechaHoy';
-import { useCrearTarea, useEditarTarea, type Tarea } from './useTareas';
+import { useServicioDeTareas } from './servicioDeTareas';
+import type { Tarea } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -19,8 +20,7 @@ interface Props {
 
 export default function TareaForm({ open, onClose, tarea }: Props) {
   const toast = useToast();
-  const crearTarea = useCrearTarea();
-  const editarTarea = useEditarTarea();
+  const servicio = useServicioDeTareas();
 
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -42,10 +42,10 @@ export default function TareaForm({ open, onClose, tarea }: Props) {
     setSaving(true);
     try {
       if (tarea) {
-        await editarTarea.mutateAsync({ taskId: tarea.id, title: titulo.trim(), description: descripcion.trim(), traffic_level: semaforo });
+        await servicio.editar({ taskId: tarea.id, title: titulo.trim(), description: descripcion.trim(), traffic_level: semaforo });
         toast('Tarea actualizada', 'success');
       } else {
-        await crearTarea.mutateAsync({ title: titulo.trim(), description: descripcion.trim(), traffic_level: semaforo, assigned_date: fecha || null });
+        await servicio.crear({ title: titulo.trim(), description: descripcion.trim(), traffic_level: semaforo, assigned_date: fecha || null });
         toast('Tarea creada', 'success');
       }
       onClose();

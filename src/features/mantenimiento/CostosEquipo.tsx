@@ -5,17 +5,16 @@ import { useConfirm } from '../../components/ConfirmProvider';
 import { fechaHoyISO, formatearFechaSola } from '../../lib/fechaHoy';
 import { calcularCostos, leerMonto, textoPesos, type TipoCosto } from './costos';
 import { periodo } from './disponibilidad';
-import { useEliminarGastoExterno, useGastosExternosQuery, useGuardarGastoExterno, useIntervencionesQuery } from './useEquipos';
-import { useConfigMantenimiento, useGuardarConfigMantenimiento } from './usePreventivo';
-import type { Equipo } from './tipos';
+import { mensajeDeError } from '../../lib/errores';
+import { useMantenimiento } from './servicio';
+import type { Equipo, GastoExterno, Intervencion } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Icono } from '@/components/Icono';
 
-// Planilla de costos del equipo, en la solapa Datos: repuestos usados (con el precio anotado al terminar
-// la OT), mano de obra propia (horas × valor de la hora) y servicios externos (cargados acá).
-// Del equipo principal se suman sus sub-equipos.
+// Los costos del equipo (del socio, 06/11/2026), en la solapa Datos de la ficha: repuestos usados (con el precio anotado al terminar la OT),
+// mano de obra propia (horas × valor de la hora) y servicios externos (cargados acá). Del equipo principal se suman sus sub-equipos.
 
 type PeriodoCostos = 'mes' | 'anio' | 'todo';
 
@@ -27,11 +26,12 @@ const PERIODOS: { id: PeriodoCostos; label: string }[] = [
 
 const NOMBRE: Record<TipoCosto, string> = { repuestos: 'Repuestos', manoDeObra: 'Mano de obra', externo: 'Externo' };
 
-export default function CostosEquipo({ equipo, subEquipos, esAdmin }: { equipo: Equipo; subEquipos: Equipo[]; esAdmin: boolean }) {
-  const { data: intervenciones } = useIntervencionesQuery();
-  const { data: gastos } = useGastosExternosQuery();
-  const config = useConfigMantenimiento();
-  const eliminar = useEliminarGastoExterno();
+interface Props { equipo: Equipo; subEquipos: Equipo[]; intervenciones: Intervencion[]; gastos: GastoExterno[] }
+
+export default function CostosEquipo({ equipo, subEquipos, intervenciones, gastos }: Props) {
+  const s = useMantenimiento();
+  const config = s.config;
+  const esAdmin = s.esAdmin;
   const toast = useToast();
   const confirmar = useConfirm();
   const [periodoId, setPeriodoId] = useState<PeriodoCostos>('anio');
@@ -47,8 +47,12 @@ export default function CostosEquipo({ equipo, subEquipos, esAdmin }: { equipo: 
 
   async function borrarGasto(id: string, concepto: string) {
     if (!(await confirmar(`¿Borrar el gasto "${concepto}"?`, { textoConfirmar: 'Borrar', peligroso: true }))) return;
-    await eliminar.mutateAsync(id);
-    toast('Gasto borrado', 'success');
+    try {
+      await s.eliminarGasto(id);
+      toast('Gasto borrado', 'success');
+    } catch (err) {
+      toast(mensajeDeError(err), 'error');
+    }
   }
 
   return (
@@ -85,7 +89,7 @@ export default function CostosEquipo({ equipo, subEquipos, esAdmin }: { equipo: 
             <div><Icono n="alerta" /> Falta el valor de la hora: las {c.horas.toLocaleString('es-AR')} h de trabajo no suman.{esAdmin && <> <button type="button" className="mt-link" onClick={() => setHoraOpen(true)}>Cargarlo</button></>}</div>
           )}
           {c.repuestosSinPrecio > 0 && (
-            <div><Icono n="alerta" /> {c.repuestosSinPrecio === 1 ? '1 repuesto usado no tiene precio' : `${c.repuestosSinPrecio} repuestos usados no tienen precio`}: se puede anotar editando el registro en el Historial.</div>
+            <div><Icono n="alerta" /> {c.repuestosSinPrecio === 1 ? '1 repuesto usado no tiene precio' : `${c.repuestosSinPrecio} repuestos usados no tienen precio`}: el precio se anota al terminar la OT.</div>
           )}
         </div>
       )}
@@ -131,7 +135,7 @@ function GastoExternoModal({ open, onClose, equipo, subEquipos }: { open: boolea
 function GastoForm({ equipo, subEquipos, onClose }: { equipo: Equipo; subEquipos: Equipo[]; onClose: () => void }) {
   const uid = useId();
   const toast = useToast();
-  const guardar = useGuardarGastoExterno();
+  const s = useMantenimiento();
   const [fecha, setFecha] = useState(fechaHoyISO());
   const [equipoId, setEquipoId] = useState(equipo.id);
   const [proveedor, setProveedor] = useState('');
@@ -143,9 +147,13 @@ function GastoForm({ equipo, subEquipos, onClose }: { equipo: Equipo; subEquipos
     const m = leerMonto(monto);
     if (!descripcion.trim()) { toast('Contá qué se hizo.', 'error'); return; }
     if (m == null || m <= 0) { toast('El monto tiene que ser un número mayor a 0.', 'error'); return; }
-    await guardar.mutateAsync({ equipoId, fecha, proveedor: proveedor.trim(), descripcion: descripcion.trim(), monto: m });
-    toast('Gasto guardado', 'success');
-    onClose();
+    try {
+      await s.guardarGasto({ equipoId, fecha, proveedor: proveedor.trim(), descripcion: descripcion.trim(), monto: m });
+      toast('Gasto guardado', 'success');
+      onClose();
+    } catch (err) {
+      toast(mensajeDeError(err), 'error');
+    }
   }
 
   return (
@@ -196,17 +204,21 @@ function CostoHoraModal({ open, onClose }: { open: boolean; onClose: () => void 
 function CostoHoraForm({ onClose }: { onClose: () => void }) {
   const uid = useId();
   const toast = useToast();
-  const config = useConfigMantenimiento();
-  const guardar = useGuardarConfigMantenimiento();
+  const s = useMantenimiento();
+  const config = s.config;
   const [valor, setValor] = useState(config.costoHora != null ? String(config.costoHora).replace('.', ',') : '');
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
     const v = valor.trim() ? leerMonto(valor) : null;
     if (valor.trim() && v == null) { toast('El valor tiene que ser un número.', 'error'); return; }
-    await guardar.mutateAsync({ ...config, costoHora: v });
-    toast('Valor de la hora guardado', 'success');
-    onClose();
+    try {
+      await s.guardarConfig({ ...config, costoHora: v });
+      toast('Valor de la hora guardado', 'success');
+      onClose();
+    } catch (err) {
+      toast(mensajeDeError(err), 'error');
+    }
   }
 
   return (

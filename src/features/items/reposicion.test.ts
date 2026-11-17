@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cantidadAComprar, necesitaReposicion } from './reposicion';
 
 describe('necesitaReposicion', () => {
-  it('no reponer si el repuesto no tiene stock mínimo configurado', () => {
+  it('no reponer si el artículo no tiene stock mínimo configurado', () => {
     expect(necesitaReposicion({ stock: 0, stock_minimo: 0, punto_pedido: 0 })).toBe(false);
   });
 
@@ -18,12 +18,12 @@ describe('necesitaReposicion', () => {
     expect(necesitaReposicion({ stock: 15, stock_minimo: 20, punto_pedido: 10 })).toBe(false);
   });
 
-  it('con punto de pedido en 0, avisa recién cuando el stock llega a 0 (repuestos de "tener solo 1")', () => {
+  it('con punto de pedido en 0, avisa recién cuando el stock llega a 0 (artículos de "tener solo 1")', () => {
     expect(necesitaReposicion({ stock: 1, stock_minimo: 1, punto_pedido: 0 })).toBe(false);
     expect(necesitaReposicion({ stock: 0, stock_minimo: 1, punto_pedido: 0 })).toBe(true);
   });
 
-  it('un repuesto sin stock cargado (null) se trata como si tuviera 0', () => {
+  it('un artículo sin stock cargado (null) se trata como si tuviera 0', () => {
     expect(necesitaReposicion({ stock: null, stock_minimo: 5, punto_pedido: 2 })).toBe(true);
   });
 });

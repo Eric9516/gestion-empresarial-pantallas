@@ -1,5 +1,5 @@
 import { clicConTeclado } from '@/lib/clicConTeclado';
-import type { Tarea } from './useTareas';
+import type { Tarea } from './tipos';
 import { Icono } from '@/components/Icono';
 
 const TRAFFIC_LABEL: Record<string, string> = { green: 'Normal', yellow: 'Atención', red: 'Crítica' };

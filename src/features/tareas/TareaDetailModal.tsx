@@ -4,7 +4,8 @@ import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
 import ReprogramarModal from './ReprogramarModal';
 import TareaForm from './TareaForm';
-import { useCancelarTarea, useCompletarTarea, useTareaHistorialQuery, useTareasQuery } from './useTareas';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeTareas } from './servicioDeTareas';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
@@ -31,10 +32,10 @@ interface Props {
 export default function TareaDetailModal({ open, onClose, taskId }: Props) {
   const toast = useToast();
   const confirmar = useConfirm();
-  const { data: tareas } = useTareasQuery();
-  const { data: historial } = useTareaHistorialQuery(taskId);
-  const completarTarea = useCompletarTarea();
-  const cancelarTarea = useCancelarTarea();
+  const servicio = useServicioDeTareas();
+  const { tareas } = servicio;
+  // el historial se vuelve a pedir cada vez que cambian las tareas (al editar, completar, reprogramar)
+  const { data: historial } = usePedido(taskId ? `${taskId}|${servicio.revision}` : null, () => servicio.historial(taskId as string), true);
   const [reprogramarOpen, setReprogramarOpen] = useState(false);
   const [editarOpen, setEditarOpen] = useState(false);
 
@@ -44,7 +45,7 @@ export default function TareaDetailModal({ open, onClose, taskId }: Props) {
   async function handleCompletar() {
     if (!t) return;
     try {
-      await completarTarea.mutateAsync(t.id);
+      await servicio.completar(t.id);
       toast('Tarea completada', 'success');
       onClose();
     } catch (e) {
@@ -55,7 +56,7 @@ export default function TareaDetailModal({ open, onClose, taskId }: Props) {
   async function handleCancelar() {
     if (!t || !(await confirmar('¿Cancelar esta tarea?', { textoConfirmar: 'Cancelar tarea' }))) return;
     try {
-      await cancelarTarea.mutateAsync(t.id);
+      await servicio.cancelar(t.id);
       toast('Tarea cancelada', 'success');
       onClose();
     } catch (e) {

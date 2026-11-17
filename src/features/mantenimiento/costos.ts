@@ -1,9 +1,9 @@
 import { dentro, type Periodo } from './disponibilidad';
 import type { Equipo, FechaISO, GastoExterno, Intervencion } from './tipos';
 
-// Costos de un equipo (decisión del encargado, 06/11/2026):
-// - Repuestos: lo que se usó en cada mantenimiento × el precio por unidad anotado al terminar la OT.
-// - Mano de obra propia: horas de trabajo de cada mantenimiento × un valor de hora único para todos.
+// Costos de un equipo (del socio, decisión del encargado 06/11/2026):
+// - Repuestos: lo que se usó en cada OT × el precio por unidad anotado al terminarla.
+// - Mano de obra propia: horas de trabajo de cada registro del historial × un valor de hora único para todos.
 // - Servicios externos: gastos cargados a mano directo en el equipo.
 // Del equipo principal se suman también sus sub-equipos (como en el historial).
 
@@ -38,13 +38,7 @@ export interface CostosEquipo {
   faltaCostoHora: boolean;
 }
 
-function numero(n: number | null | undefined): number {
-  return n != null && Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-function cantidadUsada(l: { cantidad: number; usado: number | null }): number {
-  return numero(l.usado ?? l.cantidad);
-}
+const numero = (n: number | null | undefined) => (n != null && Number.isFinite(n) && n > 0 ? n : 0);
 
 export function calcularCostos(
   equipo: Equipo,
@@ -64,13 +58,13 @@ export function calcularCostos(
   for (const i of intervenciones) {
     if (!ids.has(i.equipoId) || !enPeriodo(i.fecha)) continue;
     const sub = nombreSub.get(i.equipoId) ?? '';
-    for (const r of i.repuestos) {
-      const cant = cantidadUsada(r);
+    for (const [n, r] of i.repuestos.entries()) {
+      const cant = numero(r.cantidad);
       if (!cant) continue;
       const tienePrecio = r.precio != null && Number.isFinite(r.precio) && r.precio >= 0;
       if (!tienePrecio) repuestosSinPrecio += 1;
       lineas.push({
-        id: `${i.id}-${r.id}`, fecha: i.fecha, tipo: 'repuestos', ot: i.otNumero, subEquipo: sub,
+        id: `${i.id}-${n}`, fecha: i.fecha, tipo: 'repuestos', ot: i.otNumero, subEquipo: sub,
         concepto: `${cant.toLocaleString('es-AR')} × ${r.descripcion || r.codigo}${r.componente ? ` (${r.componente})` : ''}`,
         monto: tienePrecio ? cant * r.precio! : null,
       });
@@ -111,7 +105,7 @@ export function textoPesos(n: number): string {
 export function leerMonto(texto: string): number | null {
   const limpio = texto.replace(/[$\s]/g, '');
   if (!limpio) return null;
-  // Con coma, la coma es el decimal y los puntos son de miles; sin coma, los puntos seguidos de 3 cifras son de miles.
+  // con coma, la coma es el decimal y los puntos son de miles; sin coma, los puntos seguidos de 3 cifras son de miles
   const normal = limpio.includes(',')
     ? limpio.replace(/\./g, '').replace(',', '.')
     : /^\d{1,3}(\.\d{3})+$/.test(limpio) ? limpio.replace(/\./g, '') : limpio;

@@ -1,4 +1,7 @@
-import type { Item } from './useItems';
+import type { Item } from './tipos';
+
+// Cuántos trae como mucho el PDF del informe.
+export const LIMITE_DEL_INFORME_PDF = 5000;
 
 type ConReposicion = Pick<Item, 'stock' | 'stock_minimo' | 'punto_pedido'>;
 

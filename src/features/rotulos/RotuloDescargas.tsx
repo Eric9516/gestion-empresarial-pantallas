@@ -1,9 +1,9 @@
 import { useToast } from '../../components/ToastProvider';
 import { generarRotuloBlob } from '../../lib/generarRotuloPdf';
 import { abrirPdfBlob, descargarPdfBlob } from '../../lib/pdfBlob';
-import { registrarErrorAccion } from '../../lib/errorLogging';
-import type { Contacto, Proveedor } from '../proveedores/useProveedores';
-import type { RotuloBulto, RotuloGenerado } from './useRotulos';
+import type { Contacto, Proveedor } from '../proveedores/tipos';
+import { useServicioDeEnvios } from './servicioDeEnvios';
+import type { RotuloBulto, RotuloGenerado } from './tipos';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
@@ -20,13 +20,14 @@ interface Props {
 // como Descargar generan el blob recién al tocarlas.
 export default function RotuloDescargas({ rotulo, bultos, proveedor, contactos }: Props) {
   const toast = useToast();
+  const { registrarError } = useServicioDeEnvios();
   const total = bultos.length;
 
   async function generar(b: RotuloBulto) {
     try {
       return await generarRotuloBlob(rotulo, b, proveedor, contactos);
     } catch (err) {
-      await registrarErrorAccion('Error al generar el PDF de un rótulo', err);
+      await registrarError('Error al generar el PDF de un rótulo', err);
       toast('No se pudo generar el PDF: ' + mensajeDeError(err), 'error');
       return null;
     }

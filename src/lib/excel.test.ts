@@ -40,10 +40,10 @@ describe('Excel (la misma librería y las mismas opciones que usa la app)', () =
   });
   it('exportar: una hoja de objetos se escribe y se vuelve a leer igual (como exportExcel)', () => {
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Proveedor: 'Ñ & Cía', Rubro: 'Repuestos' }, { Proveedor: 'Acme', Rubro: '' }]), 'Proveedores');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Proveedor: 'Ñ & Cía', Rubro: 'Artículos' }, { Proveedor: 'Acme', Rubro: '' }]), 'Proveedores');
     const wb2 = XLSX.read(comoBuffer(wb, 'xlsx'), { type: 'array' });
     expect(wb2.SheetNames).toEqual(['Proveedores']);
-    expect(XLSX.utils.sheet_to_json(wb2.Sheets['Proveedores']!)).toEqual([{ Proveedor: 'Ñ & Cía', Rubro: 'Repuestos' }, { Proveedor: 'Acme', Rubro: '' }]);
+    expect(XLSX.utils.sheet_to_json(wb2.Sheets['Proveedores']!)).toEqual([{ Proveedor: 'Ñ & Cía', Rubro: 'Artículos' }, { Proveedor: 'Acme', Rubro: '' }]);
   });
   it('un archivo con una hoja llamada "__proto__" no contamina los objetos de la página (falla corregida respecto de la versión de npm)', () => {
     const wb = libro([['a'], ['b']], '__proto__');

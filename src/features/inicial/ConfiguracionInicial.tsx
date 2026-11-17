@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../components/ToastProvider';
-import { useConfiguracionQuery } from '../config/useConfiguracion';
-import { useModulos } from '../config/useModulos';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeConfiguracion } from '../admin/servicioDeConfiguracion';
 import EmpresaPane from '../admin/EmpresaPane';
 import RotuloDesignPane from '../admin/RotuloDesignPane';
 import ComisionistasCamposPane from '../admin/ComisionistasCamposPane';
@@ -10,7 +9,6 @@ import RepuestosPane from '../admin/RepuestosPane';
 import FamiliasPane from '../admin/FamiliasPane';
 import UsuariosPane from '../admin/UsuariosPane';
 import SectoresPanel from '../sectores/SectoresPanel';
-import { useCerrarConfiguracionInicial, useConteosIniciales } from './useConfiguracionInicial';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 import type { ReactNode } from 'react';
@@ -30,13 +28,18 @@ const tieneContenido = (v: unknown) => (Array.isArray(v) ? v.length > 0 : !!v &&
 // existe por separado, con una explicación. Los pasos dependen de los módulos de la empresa, se pueden
 // saltear, y se marcan como hechos solos cuando ya hay datos cargados.
 export default function ConfiguracionInicial() {
-  const navigate = useNavigate();
   const toast = useToast();
-  const { data: config } = useConfiguracionQuery();
-  const { modulos, integ } = useModulos();
-  const { data: conteos, refetch } = useConteosIniciales();
-  const cerrar = useCerrarConfiguracionInicial();
+  const { config, modulos, integ, inicial } = useServicioDeConfiguracion();
   const [actual, setActual] = useState(0);
+  // Mientras el asistente está abierto se cuenta cada pocos segundos (y al cambiar de paso): así un paso se marca como hecho apenas se carga
+  // algo, sin tener que cambiar de pantalla.
+  const [vez, setVez] = useState(0);
+  const { data: conteos } = usePedido(`conteos|${actual}|${vez}`, inicial.conteos, true);
+  useEffect(() => {
+    const reloj = window.setInterval(() => setVez(v => v + 1), 4000);
+    return () => window.clearInterval(reloj);
+  }, []);
+  const [cerrando, setCerrando] = useState(false);
 
   const pasos = useMemo<Paso[]>(() => [
     {
@@ -57,17 +60,17 @@ export default function ConfiguracionInicial() {
     ...(modulos.deposito ? [
       {
         id: 'sectores', icono: <Icono n="fabrica" />, titulo: 'Sectores', hecho: (conteos?.sectores ?? 0) > 0,
-        explicacion: 'Las áreas de la empresa. Cada retiro de repuestos se registra a nombre de un sector.',
+        explicacion: 'Las áreas de la empresa. Cada retiro de artículos se registra a nombre de un sector.',
         Contenido: SectoresPanel,
       },
       {
-        id: 'familias', icono: <Icono n="etiqueta" />, titulo: 'Familias de repuestos', hecho: (conteos?.familias ?? 0) > 0,
-        explicacion: 'La clasificación de los repuestos. Se puede cargar de una vez desde una planilla de Excel.',
+        id: 'familias', icono: <Icono n="etiqueta" />, titulo: 'Familias de artículos', hecho: (conteos?.familias ?? 0) > 0,
+        explicacion: 'La clasificación de los artículos. Se puede cargar de una vez desde una planilla de Excel.',
         Contenido: FamiliasPane,
       },
       {
-        id: 'repuestos', icono: <Icono n="herramienta" />, titulo: 'Repuestos y stock', hecho: (conteos?.repuestos ?? 0) > 0,
-        explicacion: 'Cargá el stock inicial desde Excel, o agregá los repuestos de a uno. Conviene hacerlo después de cargar las familias.',
+        id: 'repuestos', icono: <Icono n="herramienta" />, titulo: 'Artículos y stock', hecho: (conteos?.repuestos ?? 0) > 0,
+        explicacion: 'Cargá el stock inicial desde Excel, o agregá los artículos de a uno. Conviene hacerlo después de cargar las familias.',
         Contenido: RepuestosPane,
       },
     ] : []),
@@ -78,20 +81,19 @@ export default function ConfiguracionInicial() {
     },
   ], [config, modulos, conteos]);
 
-  // Al cambiar de paso se vuelven a contar los datos, por si se cargó algo en el anterior.
-  useEffect(() => { void refetch(); }, [actual, refetch]);
-
   const enResumen = actual >= pasos.length;
   const paso = pasos[actual];
   const hechos = pasos.filter(p => p.hecho).length;
 
   async function terminar(mensaje: string) {
+    setCerrando(true);
     try {
-      await cerrar.mutateAsync();
+      await inicial.cerrar();
       toast(mensaje, 'success');
-      navigate('/');
     } catch {
       toast('No se pudo cerrar el asistente. Probá de nuevo.', 'error');
+    } finally {
+      setCerrando(false);
     }
   }
 
@@ -143,12 +145,12 @@ export default function ConfiguracionInicial() {
               </div>
             ))}
             {!integ.depositoConProveedores && modulos.deposito && (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>Las reparaciones y los proveedores por repuesto no están incluidos en esta instalación.</p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>Las reparaciones y los proveedores por artículo no están incluidos en esta instalación.</p>
             )}
             <p style={{ fontSize: 13, color: 'var(--text-mid)', margin: '14px 0' }}>
               {hechos === pasos.length ? '¡Todo listo! La aplicación está configurada.' : 'Lo que falte lo podés completar cuando quieras, desde esta misma pantalla.'}
             </p>
-            <Button variant="success" style={{ width: '100%', justifyContent: 'center' }} disabled={cerrar.isPending} onClick={() => void terminar('Configuración inicial terminada')}>
+            <Button variant="success" style={{ width: '100%', justifyContent: 'center' }} disabled={cerrando} onClick={() => void terminar('Configuración inicial terminada')}>
               Terminar y empezar a usar la aplicación
             </Button>
           </div>

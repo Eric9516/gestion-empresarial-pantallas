@@ -1,4 +1,4 @@
-import type { EstadoLinea } from './useReparaciones';
+import type { EstadoLinea } from './estadoDeReparacion';
 
 const COLOR_ESTADO: Record<EstadoLinea, { bg: string; fg: string; label: string }> = {
   pendiente: { bg: '#fbf1de', fg: '#7a5408', label: 'Pendiente' },

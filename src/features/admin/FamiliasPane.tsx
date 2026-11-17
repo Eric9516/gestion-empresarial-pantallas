@@ -1,19 +1,20 @@
 import { useMemo, useRef, useState, type FocusEvent } from 'react';
 import { useToast } from '../../components/ToastProvider';
-import { useFamiliasQuery, useRenameFamilia, useRenameSubfamilia, useSubfamiliasQuery } from '../familias/useFamilias';
+import { usePedido } from '../../lib/usePedido';
 import ImportarFamiliasModal from '../familias/ImportarFamiliasModal';
-import { urlPlanillaFamilias, usePlanillaFamiliasQuery } from '../familias/useImportarFamilias';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icono } from '@/components/Icono';
 
 export default function FamiliasPane() {
-  const { data: familias } = useFamiliasQuery();
-  const { data: subfamilias } = useSubfamiliasQuery();
-  const renameFamilia = useRenameFamilia();
-  const renameSubfamilia = useRenameSubfamilia();
+  const { familias: servicio } = useServicioDeConfiguracion();
+  const datos = usePedido('familias', servicio.leer, true);
+  const familias = datos.data?.familias;
+  const subfamilias = datos.data?.subfamilias;
   const toast = useToast();
-  const { data: planilla } = usePlanillaFamiliasQuery();
+  const planillaPedida = usePedido('planilla', servicio.planilla, true);
+  const planilla = planillaPedida.data;
 
   const [busqueda, setBusqueda] = useState('');
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export default function FamiliasPane() {
     const fam = familias?.find(f => f.id === id);
     if (!nombre || fam?.nombre === nombre) return;
     try {
-      await renameFamilia.mutateAsync({ id, nombre });
+      await servicio.renombrarFamilia(id, nombre);
       flashSaved(id);
     } catch {
       toast('Error al guardar el nombre', 'error');
@@ -54,7 +55,7 @@ export default function FamiliasPane() {
     const sub = subfamilias?.find(s => s.id === id);
     if (!nombre || sub?.nombre === nombre) return;
     try {
-      await renameSubfamilia.mutateAsync({ id, nombre });
+      await servicio.renombrarSubfamilia(id, nombre);
       flashSaved(id);
     } catch {
       toast('Error al guardar el nombre', 'error');
@@ -85,13 +86,18 @@ export default function FamiliasPane() {
         <Button size="sm" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 12 }} onClick={() => setImportarOpen(true)}><Icono n="importar" /> Importar desde Excel</Button>
       </div>
       <div className="admin-card-body">
+        {datos.data?.deposito && (
+          <p style={{ fontSize: 13, color: 'var(--text-mid)', margin: '0 0 10px' }}>
+            Familias del depósito <strong>{datos.data.deposito}</strong>: cada depósito tiene las suyas. Para ver las de otro, elegilo arriba en el Depósito.
+          </p>
+        )}
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
           Los nombres se guardan solos al salir de cada campo (no hace falta un botón "Guardar"). Tocá una familia para ver sus subfamilias.
         </div>
         {planilla && (
           <p style={{ fontSize: 12, color: 'var(--text-mid)', marginBottom: 14 }}>
             Última planilla de codificación:{' '}
-            <a href={urlPlanillaFamilias(planilla.storage_path)} target="_blank" rel="noopener noreferrer">{planilla.nombre_archivo}</a>
+            <a href={planilla.url} target="_blank" rel="noopener noreferrer">{planilla.nombre_archivo}</a>
             {' '}({new Date(planilla.actualizada_at).toLocaleDateString('es-AR')})
           </p>
         )}
@@ -145,7 +151,7 @@ export default function FamiliasPane() {
           })}
         </div>
       </div>
-      <ImportarFamiliasModal open={importarOpen} onClose={() => setImportarOpen(false)} />
+      <ImportarFamiliasModal open={importarOpen} onClose={() => setImportarOpen(false)} onImportado={() => { datos.recargar(); planillaPedida.recargar(); }} />
     </div>
   );
 }

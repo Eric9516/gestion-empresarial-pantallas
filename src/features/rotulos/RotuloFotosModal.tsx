@@ -2,8 +2,9 @@ import { useRef, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { publicUrl } from '../../lib/storage';
-import { MAX_FOTOS_ROTULO, useEliminarRotuloFoto, useRotuloFotosQuery, useSubirRotuloFotos } from './useRotuloFotos';
+import { compressImage } from '../../lib/compressImage';
+import { usePedido } from '../../lib/usePedido';
+import { MAX_FOTOS_ROTULO, useServicioDeEnvios, type FotoDeEnvio } from './servicioDeEnvios';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
@@ -16,14 +17,10 @@ interface Props {
   proveedorNombre: string;
 }
 
-function fotoUrl(path: string) {
-  return publicUrl('rotulos', path);
-}
-
 export default function RotuloFotosModal({ open, onClose, grupoId, proveedorId, proveedorNombre }: Props) {
-  const { data: fotos } = useRotuloFotosQuery(grupoId);
-  const subirFotos = useSubirRotuloFotos();
-  const eliminarFoto = useEliminarRotuloFoto();
+  const servicio = useServicioDeEnvios();
+  // se vuelven a pedir cada vez que se abre (otro pudo agregar o sacar fotos)
+  const { data: fotos, recargar } = usePedido(open && grupoId ? grupoId : null, () => servicio.fotos(grupoId!));
   const toast = useToast();
   const confirmar = useConfirm();
   const inputCamaraRef = useRef<HTMLInputElement>(null);
@@ -41,19 +38,23 @@ export default function RotuloFotosModal({ open, onClose, grupoId, proveedorId, 
 
     setSubiendo(true);
     try {
-      await subirFotos.mutateAsync({ grupoId, proveedorId, proveedorNombre, files: files.slice(0, disponibles) });
+      for (const file of files.slice(0, disponibles)) {
+        await servicio.subirFoto({ grupoId, proveedorId, proveedorNombre, foto: await compressImage(file, 1600, 0.8) });
+      }
     } catch (err) {
       toast('Error al subir una foto: ' + mensajeDeError(err), 'error');
     } finally {
       setSubiendo(false);
       e.target.value = '';
+      recargar();
     }
   }
 
-  async function handleDelete(id: string, storagePath: string) {
-    if (!grupoId || !(await confirmar('¿Eliminar esta foto?', { textoConfirmar: 'Eliminar', peligroso: true }))) return;
+  async function handleDelete(f: FotoDeEnvio) {
+    if (!(await confirmar('¿Eliminar esta foto?', { textoConfirmar: 'Eliminar', peligroso: true }))) return;
     try {
-      await eliminarFoto.mutateAsync({ id, storagePath, grupoId });
+      await servicio.eliminarFoto(f);
+      recargar();
     } catch {
       toast('Error al eliminar la foto', 'error');
     }
@@ -64,11 +65,11 @@ export default function RotuloFotosModal({ open, onClose, grupoId, proveedorId, 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
         {fotos?.map(f => (
           <div key={f.id} style={{ position: 'relative', width: 90, height: 90 }}>
-            <a href={fotoUrl(f.storage_path)} target="_blank" rel="noopener noreferrer">
-              <img src={fotoUrl(f.storage_path)} style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, border: '1.5px solid var(--border)' }} alt="" />
+            <a href={f.url} target="_blank" rel="noopener noreferrer">
+              <img src={f.url} style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, border: '1.5px solid var(--border)' }} alt="" />
             </a>
             <button
-              type="button" onClick={() => void handleDelete(f.id, f.storage_path)} title="Eliminar foto"
+              type="button" onClick={() => void handleDelete(f)} title="Eliminar foto"
               style={{ position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: '50%', background: 'var(--danger)', color: 'white', border: 'none', cursor: 'pointer', fontSize: 12, lineHeight: 1 }}
             ><Icono n="cerrar" /></button>
           </div>

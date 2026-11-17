@@ -1,21 +1,18 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabaseClient';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { MODULOS, dependientesEnUso, requisitosFaltantes, type ModuloId } from '../../lib/modulos';
-import { useModulos } from '../config/useModulos';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
 import { Icono } from '@/components/Icono';
 
 // El dueño apaga (o vuelve a prender) los módulos de su plan que no usa. No puede prender nada que el plan no incluya:
 // eso lo define quien vende, y la base de datos lo hace cumplir aunque alguien intente saltearse esta pantalla.
 export default function ModulosPane() {
-  const { modulos, contratados, apagados, leida, listo } = useModulos();
+  const { modulos, licencia: { contratados, apagados, leida, listo }, definirModulo } = useServicioDeConfiguracion();
   const toast = useToast();
   const confirmar = useConfirm();
-  const queryClient = useQueryClient();
   const [trabajando, setTrabajando] = useState<ModuloId | null>(null);
 
   const incluidos = leida ? MODULOS.filter(m => contratados[m.id]) : [];
@@ -39,9 +36,7 @@ Los datos no se borran: si lo volvés a prender, vuelven a estar.`, {
     }
     setTrabajando(id);
     try {
-      const { error } = await supabase.rpc('definir_modulo_del_dueno', { p_modulo: id, p_apagado: apagar });
-      if (error) throw error;
-      await queryClient.invalidateQueries({ queryKey: ['licencia'] });
+      await definirModulo(id, apagar);
       toast(apagar ? `"${info.nombre}" apagado` : `"${info.nombre}" prendido`, 'success');
     } catch (e) {
       toast('No se pudo cambiar: ' + mensajeDeError(e), 'error');

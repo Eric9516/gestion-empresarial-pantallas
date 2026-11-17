@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import type { User } from '@supabase/supabase-js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icono } from '@/components/Icono';
@@ -7,7 +6,15 @@ import { mensajeDeError } from '@/lib/errores';
 import { useToast } from '../../components/ToastProvider';
 import type { Profile } from '../../lib/types';
 import { fechaCorta, LARGO_MINIMO_CLAVE, problemaDeLaClave, ROLES_EXPLICADOS, type Permiso } from './permisos';
-import { cambiarContrasena, cerrarSesionEnLosDemasEquipos } from './seguridad';
+
+/** Lo que se muestra de la cuenta (cada app lo saca de su sesión). */
+export interface DatosDeSesion { created_at?: string; last_sign_in_at?: string | null }
+
+/** Cambiar la contraseña propia (comprobando la actual) y cerrar la sesión en los demás equipos: cada app a su manera. */
+export interface AccionesDeSeguridad {
+  cambiarContrasena: (email: string, actual: string, nueva: string) => Promise<void>;
+  cerrarOtras: () => Promise<void>;
+}
 
 const caja = { background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 12, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 } as const;
 const titulo = { fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--text-muted)' } as const;
@@ -32,7 +39,7 @@ export function PermisosDelPerfil({ permisos }: { permisos: Permiso[] }) {
   );
 }
 
-export function DatosDeLaCuenta({ profile, user }: { profile: Profile | null; user: User | null }) {
+export function DatosDeLaCuenta({ profile, user }: { profile: Profile | null; user: DatosDeSesion | null }) {
   const filas: [string, string][] = [
     ['Cuenta creada', fechaCorta(profile?.created_at ?? user?.created_at)],
     ...(user?.last_sign_in_at ? [['Esta sesión empezó', fechaCorta(user.last_sign_in_at, true)] as [string, string]] : []),
@@ -51,7 +58,7 @@ export function DatosDeLaCuenta({ profile, user }: { profile: Profile | null; us
   );
 }
 
-export function SeguridadDelPerfil({ email }: { email: string | null | undefined }) {
+export function SeguridadDelPerfil({ email, acciones }: { email: string | null | undefined; acciones: AccionesDeSeguridad }) {
   const toast = useToast();
   const [abierto, setAbierto] = useState(false);
   const [actual, setActual] = useState('');
@@ -70,7 +77,7 @@ export function SeguridadDelPerfil({ email }: { email: string | null | undefined
     if (!email) { toast('No se pudo identificar tu cuenta', 'error'); return; }
     setEnviando(true);
     try {
-      await cambiarContrasena(email, actual, nueva);
+      await acciones.cambiarContrasena(email, actual, nueva);
       toast('Contraseña cambiada', 'success');
       cerrarFormulario();
     } catch (e) {
@@ -83,7 +90,7 @@ export function SeguridadDelPerfil({ email }: { email: string | null | undefined
   async function cerrarOtras() {
     setCerrando(true);
     try {
-      await cerrarSesionEnLosDemasEquipos();
+      await acciones.cerrarOtras();
       toast('Se cerró la sesión en los demás equipos', 'success');
     } catch (e) {
       toast('No se pudo cerrar: ' + mensajeDeError(e), 'error');

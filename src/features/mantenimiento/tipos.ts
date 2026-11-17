@@ -1,19 +1,19 @@
-// Tipos del módulo de Mantenimiento (equipos, historial, repuestos críticos, manuales,
-// rutinas preventivas y órdenes de trabajo). Todavía NO existen en la base: hoy las
-// pantallas usan datos de ejemplo (datosDemo.ts) a través de los hooks use*.ts.
-// Cuando se conecte la base, estas formas son las que tienen que devolver esos hooks.
+// Tipos del módulo de Mantenimiento, etapa 1: equipos, sectores, historial, repuestos críticos y manuales. Salen del diseño del socio
+// (su repositorio, src/features/mantenimiento/tipos.ts), con lo que ya guarda la base. Las órdenes de trabajo, las rutinas preventivas, las
+// planillas y las mediciones llegan en las etapas 2 y 3.
 
 /** Fecha sin hora, como texto yyyy-mm-dd (igual que las columnas "date" de la base). */
 export type FechaISO = string;
 
 export interface Equipo {
   id: string;
-  /** Código corto del equipo (también es lo que lleva su QR). Único. */
+  /** Código corto del equipo (también es lo que lleva su QR). Único en la empresa. */
   codigo: string;
   nombre: string;
-  /** Sector productivo. Es una etiqueta, no una carpeta. */
+  /** El sector o sub-sector elegido (null = sin sector). */
+  sectorId: string | null;
+  /** Nombres para mostrar y buscar: el sector y, si el elegido es un sub-sector, el sub-sector. */
   sector: string;
-  /** Sub-sector dentro del sector (opcional; ej.: Servicios → "Aire comprimido"). */
   subsector: string;
   /** Palabras clave libres para encontrarlo rápido ("bomba", "línea 1", "frío"). */
   etiquetas: string[];
@@ -23,35 +23,36 @@ export interface Equipo {
   ubicacion: string;
   critico: boolean;
   notas: string;
-  /**
-   * Si es un sub-equipo, el equipo principal al que pertenece (ej.: la bomba de un pasteurizador).
-   * Un solo nivel: un sub-equipo no puede tener sub-equipos propios.
-   */
+  /** Si es un sub-equipo, el equipo principal al que pertenece. Un solo nivel. */
   padreId: string | null;
 }
 
-export type TipoMantenimiento = 'correctivo' | 'preventivo';
-
-/**
- * Un repuesto en una OT, una rutina o el historial: qué repuesto (código del Depósito), cuántos y en qué
- * componente del equipo va (un sub-equipo o una parte escrita a mano, ej.: "Motor lado acople").
- */
-export interface RepuestoLinea {
-  id: string;
-  componente: string;
-  codigo: string;
-  descripcion: string;
-  /** Cantidad prevista (en la OT o la rutina) o usada (en el historial). */
-  cantidad: number;
-  /** Cantidad que realmente se usó, al terminar la OT (null mientras está abierta). */
-  usado: number | null;
-  /**
-   * Precio por unidad, en pesos, que se anota al terminar la OT o al registrar el mantenimiento (para los costos
-   * del equipo). Queda guardado con el precio de ese día aunque después aumente. Sin anotar = null.
-   */
-  precio?: number | null;
+/** Lo que la lista muestra de cada equipo además de sus datos (lo calcula el servidor). */
+export interface ResumenDeEquipo {
+  /** El último registro del historial. */
+  ultimo: { fecha: FechaISO; tipo: TipoMantenimiento } | null;
+  /** Tuvo un correctivo en los últimos 30 días. */
+  correctivoReciente: boolean;
+  /** A alguno de sus repuestos críticos no le alcanza el stock del Depósito. */
+  faltaRepuesto: boolean;
 }
 
+export interface EquipoDeLista extends Equipo {
+  resumen: ResumenDeEquipo;
+}
+
+export interface Sector {
+  id: string;
+  nombre: string;
+  /** null = sector; si no, es un sub-sector de ese sector. */
+  padreId: string | null;
+  orden: number | null;
+}
+
+export interface SubsectorConCantidad { id: string; nombre: string; equipos: number }
+export interface SectorConCantidad { id: string; nombre: string; equipos: number; subsectores: SubsectorConCantidad[] }
+
+export type TipoMantenimiento = 'correctivo' | 'preventivo';
 export type Prioridad = 'urgente' | 'normal';
 
 /** Datos propios de un correctivo (falla, causa, solución y tiempo de equipo parado). */
@@ -59,96 +60,16 @@ export interface DetalleCorrectivo {
   prioridad: Prioridad;
   /** Lo que se reportó: el síntoma ("pierde agua por el sello"). */
   falla: string;
-  /** Por qué pasó (se completa al terminar). */
+  /** Por qué pasó. */
   causa: string;
-  /** Qué se hizo para solucionarlo (se completa al terminar). */
+  /** Qué se hizo para solucionarlo. */
   solucion: string;
   /** Horas que el equipo estuvo parado por la falla. */
   horasParada: number | null;
 }
 
-/** Una tarea en la que hay que anotar un valor (ej.: vibración en mm/s), con su rango normal (opcional). */
-export interface Medicion {
-  unidad: string;
-  minimo: number | null;
-  maximo: number | null;
-}
-
-/** Una tarea de una planilla: se tilda, o además se anota un valor si tiene `medicion`. */
-export interface TareaDef {
-  id: string;
-  texto: string;
-  medicion: Medicion | null;
-}
-
-/**
- * Planilla de tareas armada de antemano (ej.: "Bomba centrífuga – mensual"). Las rutinas que la usan
- * toman sus tareas de acá: si la planilla cambia, cambian todas (y sus OT pendientes).
- */
-export interface PlanillaTareas {
-  id: string;
-  nombre: string;
-  tareas: TareaDef[];
-  notas: string;
-}
-
-/** Una tarea de la OT y si se hizo (para el historial); si era una medición, con el valor anotado. */
-export interface TareaRegistrada {
-  texto: string;
-  hecha: boolean;
-  medicion?: Medicion | null;
-  valor?: number | null;
-}
-
-/** Un técnico que trabajó en la OT: cuándo terminó y de qué hora a qué hora (las horas hombre se calculan). */
-export interface TrabajoTecnico {
-  id: string;
-  nombre: string;
-  /** Fecha en que terminó. */
-  fecha: FechaISO;
-  /** Hora de inicio y de término, "HH:MM" (vacío = sin anotar). */
-  inicio: string;
-  fin: string;
-}
-
-/** Liberación del equipo al terminar: controles de entrega (limpieza, sanitización...) y quién lo recibió. */
-export interface Liberacion {
-  controles: { texto: string; ok: boolean }[];
-  /** Quién recibe el equipo (por ejemplo, el responsable de Producción). */
-  recibio: string;
-}
-
-/** Opciones del módulo que elige cada empresa. */
-export interface ConfigMantenimiento {
-  /** Datos del registro de calidad que salen arriba a la derecha de la OT impresa (ej.: REG-MANT-01). */
-  registroCodigo: string;
-  registroVersion: string;
-  registroVigencia: FechaISO | '';
-  /** Controles de la liberación del equipo (vacío = la OT no tiene liberación). */
-  controlesLiberacion: string[];
-  /** Quién firma la liberación (ej.: "Responsable de Producción"). */
-  recibeLiberacion: string;
-  /** Valor de la hora hombre de mantenimiento, en pesos, uno solo para todos (para los costos). Sin cargar = null. */
-  costoHora: number | null;
-  /** Horario en que les llegan las OT terminadas al jefe de taller y al responsable (fuera de ese horario esperan). */
-  horarioRecepcion: HorarioRecepcion;
-}
-
-/**
- * Gasto de un servicio externo (un técnico de afuera, un taller, un service), cargado directo en el equipo.
- * PARA ERIC: tabla nueva (ver NOTAS-PARA-ERIC.md).
- */
-export interface GastoExterno {
-  id: string;
-  equipoId: string;
-  fecha: FechaISO;
-  /** Quién lo hizo (empresa o persona). */
-  proveedor: string;
-  /** Qué se hizo. */
-  descripcion: string;
-  /** Monto en pesos. */
-  monto: number;
-}
+/** Una persona de Mantenimiento (administrador o técnico) que puede figurar en un trabajo. */
+export interface Tecnico { id: string; nombre: string }
 
 /** Una entrada del historial del equipo (lo que se hizo). */
 export interface Intervencion {
@@ -157,227 +78,353 @@ export interface Intervencion {
   fecha: FechaISO;
   tipo: TipoMantenimiento;
   descripcion: string;
-  realizadoPor: string;
+  /** Quiénes lo hicieron (id del usuario, o null si ya no existe, y su nombre); si salió de una OT, con su horario. */
+  tecnicos: ({ id: string | null; nombre: string } & Partial<Pick<TrabajoTecnico, 'fecha' | 'inicio' | 'fin'>>)[];
   /** Horas de trabajo (opcional). */
   horas: number | null;
-  /** Repuestos usados, en texto libre (registros viejos o importados de Excel). */
+  /** Repuestos usados, escritos. */
   repuestosUsados: string;
-  /** Si salió de una orden de trabajo, cuál. */
-  otId: string | null;
-  /** Repuestos usados con su componente (los que se descontaron del stock). */
-  repuestos: RepuestoLinea[];
-  /** Las tareas de la OT y cuáles se hicieron. */
-  tareas: TareaRegistrada[];
   /** Solo en correctivos. */
   correctivo: DetalleCorrectivo | null;
-  /** Número de la OT (para mostrarlo aunque la OT se borre). */
+  /** Si salió de una orden de trabajo, su número (OT-0012). */
   otNumero: string | null;
-  /** Técnicos que trabajaron, con sus horarios (si salió de una OT). */
-  tecnicos: TrabajoTecnico[];
-  liberacion: Liberacion | null;
-  /** Solo en preventivos: horas que el equipo estuvo parado (en los correctivos va en `correctivo.horasParada`). */
-  horasParada?: number | null;
-  /** Quién revisó (jefe de taller) y quién aprobó (responsable) la OT de la que salió. */
-  revisadoPor?: string | null;
-  aprobadoPor?: string | null;
+  /** Horas que el equipo estuvo parado, también en los preventivos (en los correctivos es la misma que `correctivo.horasParada`). */
+  horasParada: number | null;
+  /** Quién revisó (jefe de taller) y quién aprobó (responsable) la OT de la que salió (vacío si no salió de una OT). */
+  revisadoPor: string;
+  aprobadoPor: string;
+  /** Los repuestos que se usaron en la OT de la que salió, con su precio (para los costos del equipo). */
+  repuestos: RepuestoUsado[];
 }
 
-/** Repuesto crítico de un equipo. Se vincula por código con los repuestos del Depósito. */
-export interface RepuestoCritico {
+/** Un repuesto usado en una OT: cuánto y a qué precio por unidad (null = no se anotó). */
+export interface RepuestoUsado { codigo: string; descripcion: string; componente: string; cantidad: number; precio: number | null }
+
+/** Un gasto de un servicio externo (un técnico de afuera, un taller, un service), cargado directo en el equipo. */
+export interface GastoExterno {
   id: string;
   equipoId: string;
+  fecha: FechaISO;
+  proveedor: string;
+  descripcion: string;
+  monto: number;
+}
+
+/** Una parada de un equipo por mantenimiento (para la disponibilidad): sale del historial. */
+export interface Parada { equipoId: string; fecha: FechaISO; tipo: TipoMantenimiento; horas: number }
+
+// ---------- Etapa 2: rutinas preventivas y órdenes de trabajo ----------
+
+/**
+ * Un repuesto en una OT o una rutina: en qué componente del equipo va, qué repuesto (del Depósito, o escrito a mano: ese no descuenta
+ * stock) y cuántos. En una OT terminada, cuánto se usó, cuánto se descontó y cuánto faltó descontar.
+ */
+export interface RepuestoLinea {
+  /** Para la pantalla (no es el de la base). */
+  id: string;
+  componente: string;
+  itemId: string | null;
+  codigo: string;
+  descripcion: string;
+  /** Previsto (en la OT o la rutina). */
+  cantidad: number;
+  /** Al terminar: cuánto se usó de verdad (0 = no se cambió). */
+  usado: number | null;
+  descontado?: number | null;
+  faltante?: number | null;
+  /** El stock del Depósito ahora (null si es un repuesto escrito a mano). */
+  stock?: number | null;
+  /** Precio por unidad, en pesos, que se anota al terminar la OT (queda con el precio de ese día). Sin anotar = null. */
+  precio?: number | null;
+  ubicacion?: string | null;
+}
+
+/** Una tarea que pide anotar un valor: su unidad y su rango normal (los límites son opcionales). */
+export interface Medicion {
+  unidad: string;
+  minimo: number | null;
+  maximo: number | null;
+}
+
+/** Una tarea de una planilla o una rutina: se tilda, o además se anota un valor si tiene `medicion`. */
+export interface TareaDef {
+  texto: string;
+  medicion: Medicion | null;
+}
+
+/** Una lista de tareas armada de antemano (ej.: "Bomba centrífuga – mensual"). Las rutinas la usan; si cambia, cambian todas. */
+export interface PlanillaTareas {
+  id: string;
+  nombre: string;
+  notas: string;
+  tareas: TareaDef[];
+}
+
+/** La liberación del equipo al terminar una OT: los controles de entrega y quién lo recibió. */
+export interface Liberacion {
+  controles: { texto: string; ok: boolean }[];
+  recibio: string;
+}
+
+/** El formato de la OT (uno por empresa, lo elige quien administra). */
+export interface ConfigMantenimiento {
+  /** Datos del registro de calidad que salen arriba a la derecha de la OT impresa (ej.: REG-MANT-01). */
+  registroCodigo: string;
+  registroVersion: string;
+  registroVigencia: FechaISO | '';
+  /** Controles de la liberación del equipo (vacío = la OT no tiene liberación). */
+  controlesLiberacion: string[];
+  /** Quién recibe el equipo (ej.: "Responsable de Producción"). */
+  recibeLiberacion: string;
+  /** Valor de la hora hombre de mantenimiento, en pesos, uno solo para todos (para los costos). Sin cargar = null. */
+  costoHora: number | null;
+  /** Cuándo les llegan las OT terminadas al jefe de taller y al responsable (fuera de ese horario esperan). */
+  horarioRecepcion: HorarioRecepcion;
+}
+
+/** Un día de la semana en que se reciben OT terminadas (0 = domingo … 6 = sábado), con su horario "hh:mm". */
+export interface FranjaRecepcion { dia: number; desde: string; hasta: string }
+export interface HorarioRecepcion { dias: FranjaRecepcion[] }
+
+/**
+ * En qué parte del circuito está la OT (quién tiene que hacer algo con ella):
+ * por_derivar (el responsable la manda al jefe de taller) → por_asignar (el jefe la asigna) → asignada (la hacen los técnicos) →
+ * a_revisar (la revisa el jefe) → para_aprobar (la aprueba el responsable; recién ahí va al historial y descuenta repuestos) → aprobada.
+ */
+export type EtapaOT = 'por_derivar' | 'por_asignar' | 'asignada' | 'a_revisar' | 'para_aprobar' | 'aprobada';
+
+/** Un paso del recorrido de la OT: quién hizo qué y cuándo ("aaaa-mm-ddThh:mm", hora de la empresa). */
+export interface PasoOT { cuando: string; quien: string; accion: string; comentario: string }
+
+/** Los perfiles del circuito: el responsable (el administrador de Mantenimiento), el jefe de taller y el técnico. */
+export type RolMantenimiento = 'responsable' | 'jefe' | 'tecnico' | 'consulta';
+
+export interface Rutina {
+  id: string;
+  equipoId: string;
+  tareas: TareaDef[];
+  /** La planilla de donde salen sus tareas (si cambia la planilla, cambian las tareas). */
+  planillaId: string | null;
+  frecuenciaDias: number;
+  proximaFecha: FechaISO;
+  /** Con cuántos días de anticipación se avisa. */
+  avisoDias: number;
+  responsableId: string | null;
+  responsable: string;
+  activa: boolean;
+  repuestos: RepuestoLinea[];
+}
+
+export type TipoOT = 'preventiva' | 'correctiva';
+export type EstadoOT = 'pendiente' | 'en_curso' | 'terminada';
+
+/** Un técnico que trabajó en la OT: cuándo terminó y de qué hora a qué hora (las horas hombre se calculan). */
+export interface TrabajoTecnico {
+  usuarioId: string | null;
+  nombre: string;
+  /** Fecha en que terminó (vacío = sin anotar). */
+  fecha: FechaISO | '';
+  /** "HH:MM" (vacío = sin anotar). */
+  inicio: string;
+  fin: string;
+}
+
+export interface TareaOT { id: string; texto: string; hecha: boolean; medicion: Medicion | null; valor: number | null }
+
+export interface OrdenTrabajo {
+  id: string;
+  numero: number;
+  tipo: TipoOT;
+  equipoId: string;
+  rutinaId: string | null;
+  fechaProgramada: FechaISO;
+  asignadoId: string | null;
+  asignado: string;
+  estado: EstadoOT;
+  /** Cuándo tocaron "Empezar" (momento ISO). */
+  empezadaAt: string | null;
+  fechaCierre: FechaISO | null;
+  observaciones: string;
+  horas: number | null;
+  /** Con cuántos días se avisa (los de su rutina; 3 en las correctivas). */
+  avisoDias: number;
+  tareas: TareaOT[];
+  repuestos: RepuestoLinea[];
+  tecnicos: TrabajoTecnico[];
+  /** Solo en correctivas: prioridad, falla, causa, solución y tiempo parado. */
+  correctivo: DetalleCorrectivo | null;
+  /** La liberación del equipo (en las terminadas, si el formato la pide). */
+  liberacion: Liberacion | null;
+  /** Solo en preventivas: horas que el equipo estuvo parado (en las correctivas va en `correctivo`). */
+  horasParada: number | null;
+  /** En qué parte del circuito está. */
+  etapa: EtapaOT;
+  /** Los técnicos asignados (id del usuario, o null si ya no existe, y su nombre). */
+  asignados: { id: string | null; nombre: string }[];
+  /** El recorrido: quién la derivó, asignó, terminó, revisó, devolvió y aprobó. */
+  pasos: PasoOT[];
+  /** Cuándo la terminó el técnico ("aaaa-mm-ddThh:mm"): de ahí sale cuándo les llega para revisar. */
+  terminadaEn: string | null;
+}
+
+/** Al aprobar: qué OT nuevas se generan (van al jefe de taller). */
+export interface AprobacionInput {
+  /** Una OT con las tareas que quedaron en NO (preventivas). */
+  otPendientes: boolean;
+  /** Una OT correctiva para revisar los valores fuera de rango. */
+  otPorValores: boolean;
+  /** Tareas para una OT nueva, una por renglón (en las correctivas, lo pendiente que escribió el técnico en las observaciones). */
+  tareasNuevas: string;
+}
+
+export interface ResultadoAprobacion { pendientes: number | null; aMano: number | null; valores: number | null; descontados: number; faltantes: number }
+
+/** La OT correctiva que carga el técnico después de hacer el trabajo (llamado de guardia): nace terminada, para revisar. */
+export interface CorrectivaCargadaInput {
+  equipoId: string;
+  fecha: FechaISO;
+  prioridad: Prioridad;
+  falla: string;
+  causa: string;
+  /** Trabajo realizado. */
+  solucion: string;
+  horas: number | null;
+  horasParada: number | null;
+  /** Lo que quedó pendiente. */
+  observaciones: string;
+  liberacion: Liberacion | null;
+  tecnicos: TrabajoTecnico[];
+  /** Los repuestos usados (`usado` = cuánto se usó), con su precio. */
+  repuestos: Pick<RepuestoLinea, 'componente' | 'itemId' | 'codigo' | 'descripcion' | 'cantidad' | 'usado' | 'precio'>[];
+}
+
+export interface RutinaInput {
+  id: string | null;
+  equipoId: string;
+  tareas: TareaDef[];
+  planillaId: string | null;
+  frecuenciaDias: number;
+  proximaFecha: FechaISO;
+  avisoDias: number;
+  responsableId: string | null;
+  activa: boolean;
+  repuestos: Pick<RepuestoLinea, 'componente' | 'itemId' | 'codigo' | 'descripcion' | 'cantidad'>[];
+}
+
+export interface CorrectivaInput {
+  equipoId: string;
+  fecha: FechaISO;
+  asignadoId: string | null;
+  prioridad: Prioridad;
+  falla: string;
+  tareas: TareaDef[];
+  repuestos: Pick<RepuestoLinea, 'componente' | 'itemId' | 'codigo' | 'descripcion' | 'cantidad'>[];
+}
+
+export interface CierreInput {
+  fecha: FechaISO;
+  observaciones: string;
+  /** Las horas en total, si no se cargaron los horarios de los técnicos. */
+  horas: number | null;
+  causa: string;
+  solucion: string;
+  horasParada: number | null;
+  /** Pasar lo que quedó sin hacer a una OT nueva. */
+  otPendientes: boolean;
+  /** Crear una OT correctiva para revisar los valores fuera de rango. */
+  otPorValores: boolean;
+  liberacion: Liberacion | null;
+  tecnicos: TrabajoTecnico[];
+  repuestos: Pick<RepuestoLinea, 'componente' | 'itemId' | 'codigo' | 'descripcion' | 'cantidad' | 'usado' | 'precio'>[];
+}
+
+export interface ResultadoCierre { siguiente: number | null; pendientes: number | null; valores: number | null; descontados: number; faltantes: number }
+
+/** Repuesto crítico de un equipo: un repuesto del Depósito, con su stock. */
+export interface RepuestoCritico {
+  equipoId: string;
+  itemId: string;
   codigo: string;
   descripcion: string;
   /** Cuántos conviene tener siempre para este equipo. */
   cantidad: number;
   nota: string;
+  stock: number | null;
+  ubicacion: string | null;
+  deposito: string | null;
 }
 
 export interface Manual {
   id: string;
   equipoId: string;
   nombre: string;
-  /** Dirección para abrir el archivo. En modo de ejemplo solo vive mientras la página está abierta. */
-  url: string | null;
+  /** Dirección para abrirlo (la sirve la app, que revisa que la persona pueda verlo). */
+  url: string;
   tamanioBytes: number | null;
   subidoEl: FechaISO;
 }
 
-/** Rutina de mantenimiento preventivo: algo que se repite cada N días en un equipo. */
-export interface RutinaPreventiva {
-  id: string;
-  equipoId: string;
-  /** Lo que hay que hacer: una tarea por renglón. */
-  tarea: string;
-  /** Cada cuántos días se repite. */
-  frecuenciaDias: number;
-  /** Fecha de la próxima vez que toca. */
-  proximaFecha: FechaISO;
-  /** Con cuántos días de anticipación se avisa. */
-  avisoDiasAntes: number;
-  responsable: string;
-  activa: boolean;
-  /** Repuestos que lleva cada vez (se copian a cada OT que genera). */
-  repuestos: RepuestoLinea[];
-  /** Si toma las tareas de una planilla (entonces `tarea` y `mediciones` se copian de ella). */
-  planillaId: string | null;
-  /** Una por renglón de `tarea` (mismo orden): null = se tilda; si no, hay que anotar un valor. */
-  mediciones: (Medicion | null)[];
-}
-
-export type TipoOT = 'preventiva' | 'correctiva';
-/** Cómo va el trabajo: sin empezar, empezado, o terminado por el técnico. */
-export type EstadoOT = 'pendiente' | 'en_curso' | 'terminada';
-
-/**
- * En qué parte del circuito está la OT (quién tiene que hacer algo con ella):
- * - por_derivar: preventiva recién generada, la tiene que mandar el responsable al jefe de taller.
- * - por_asignar: la tiene el jefe de taller, que la asigna a uno o varios técnicos.
- * - asignada: la tienen los técnicos (pendiente o en curso).
- * - a_revisar: el técnico la terminó; la revisa el jefe de taller.
- * - para_aprobar: revisada; la aprueba el responsable. Recién ahí va al historial y descuenta repuestos.
- * - aprobada: cerrada.
- */
-export type EtapaOT = 'por_derivar' | 'por_asignar' | 'asignada' | 'a_revisar' | 'para_aprobar' | 'aprobada';
-
-/** Perfiles del módulo. PARA ERIC: roles nuevos de Mantenimiento (ver NOTAS-PARA-ERIC.md). */
-export type RolMantenimiento = 'responsable' | 'jefe' | 'tecnico';
-
-/** Una persona que usa el módulo. MODO DE EJEMPLO: inventadas, para probar el circuito con "Ver como". */
-export interface PersonaMantenimiento {
-  id: string;
-  nombre: string;
-  rol: RolMantenimiento;
-}
-
-/** Un paso del recorrido de la OT (quién hizo qué y cuándo), para saber siempre por dónde pasó. */
-export interface PasoOT {
-  /** Fecha y hora, "aaaa-mm-ddThh:mm". */
-  cuando: string;
-  quien: string;
-  accion: string;
-  comentario: string;
-}
-
-/** Un día de la semana en que se reciben OT terminadas, con su horario ("hh:mm"). */
-export interface FranjaRecepcion {
-  /** 0 = domingo ... 6 = sábado. */
-  dia: number;
-  desde: string;
-  hasta: string;
-}
-
-/** Horario en que les llegan las OT terminadas al jefe de taller y al responsable (cada día con su horario). */
-export interface HorarioRecepcion {
-  dias: FranjaRecepcion[];
-}
-
-/** Orden de trabajo. Las preventivas las genera sola cada rutina (una por aviso). */
-export interface OrdenTrabajo {
-  id: string;
-  /** Número visible: OT-0001, OT-0002... */
-  numero: string;
-  tipo: TipoOT;
-  equipoId: string;
-  rutinaId: string | null;
-  fechaProgramada: FechaISO;
-  /** Lo que hay que hacer: una tarea por renglón (se muestra como lista para tildar). */
-  tareas: string;
-  /** Qué tareas se hicieron: una marca por renglón de `tareas`, en el mismo orden. */
-  tareasHechas: boolean[];
-  asignadoA: string;
-  estado: EstadoOT;
-  fechaCierre: FechaISO | null;
-  observaciones: string;
-  horas: number | null;
-  repuestosUsados: string;
-  /** Repuestos previstos, con su componente; al terminar se anota cuánto se usó de cada uno. */
-  repuestos: RepuestoLinea[];
-  /** Solo en correctivas: prioridad, falla, causa, solución y tiempo parado. */
-  correctivo: DetalleCorrectivo | null;
-  /** Una por renglón de `tareas`: null = se tilda; si no, hay que anotar un valor. */
-  mediciones: (Medicion | null)[];
-  /** Los valores anotados, uno por renglón de `tareas` (null = sin anotar). */
-  valores: (number | null)[];
-  /** Al terminar: técnicos con sus horarios y la liberación del equipo. */
-  tecnicos: TrabajoTecnico[];
-  liberacion: Liberacion | null;
-  /** Solo en preventivas, al terminar: horas que el equipo estuvo parado (en las correctivas va en `correctivo`). */
-  horasParada?: number | null;
-  /** En qué parte del circuito está (derivar, asignar, revisar, aprobar). */
-  etapa: EtapaOT;
-  /** Técnicos asignados (ids de PersonaMantenimiento). */
-  asignados: string[];
-  /** Recorrido: quién la derivó, asignó, terminó, revisó, devolvió o aprobó, y cuándo. */
-  pasos: PasoOT[];
-  /** Cuándo la terminó el técnico ("aaaa-mm-ddThh:mm"): de ahí sale cuándo les llega para revisar. */
-  terminadaEn: string | null;
-  /**
-   * Lo que cargó el técnico al terminar. Se guarda hasta que el responsable la aprueba: recién ahí pasa al
-   * historial del equipo y se descuentan los repuestos.
-   */
-  cierre: DatosCierre | null;
-}
-
-/** Lo que carga el técnico al terminar una OT. */
-export interface DatosCierre {
-  fechaCierre: FechaISO;
-  /** Qué tareas se hicieron (una marca por tarea). */
-  tareasHechas: boolean[];
-  realizadoPor: string;
-  observaciones: string;
-  horas: number | null;
-  /** Texto libre (opcional, además de los repuestos con detalle). */
-  repuestosUsados: string;
-  /** Los repuestos de la OT con la cantidad que realmente se usó (0 = no se cambió) y los que se agregaron. */
-  repuestos: RepuestoLinea[];
-  /** Técnicos con sus horarios (si se cargan, las horas son la suma de sus horas hombre). */
-  tecnicos?: TrabajoTecnico[];
-  /** Controles de entrega del equipo y quién lo recibió. */
-  liberacion?: Liberacion | null;
-  /** Solo correctivas: causa, solución y horas de parada (la prioridad y la falla vienen de la OT). */
-  correctivo?: Pick<DetalleCorrectivo, 'causa' | 'solucion' | 'horasParada'>;
-  /** Solo preventivas: horas que el equipo estuvo parado. */
-  horasParada?: number | null;
-}
-
-/**
- * Un descuento de stock hecho al terminar una OT o registrar un mantenimiento.
- * MODO DE EJEMPLO: se guarda acá y se resta del stock que se muestra (no toca el Depósito real).
- * PARA ERIC: con la base, cada consumo es un retiro del Depósito (motivo: número de OT y equipo).
- */
-export interface ConsumoStock {
-  id: string;
-  fecha: FechaISO;
-  codigo: string;
-  descripcion: string;
-  cantidad: number;
-  equipoId: string;
-  otId: string | null;
-  intervencionId: string;
-}
-
-/** Todo lo que maneja el módulo, junto (lo usa la exportación a Excel). */
-export interface DatosMantenimiento {
-  /** Sectores creados a mano (también cuentan los que ya usan los equipos). */
-  sectores: string[];
-  /** Sub-sectores creados a mano (también cuentan los que ya usan los equipos). */
-  subsectores: { sector: string; nombre: string }[];
-  /** Orden de los sectores elegido por la empresa (por importancia). Los que no están van al final, por nombre. */
-  ordenSectores: string[];
-  equipos: Equipo[];
+/** Todo lo de un equipo junto (su ficha). */
+export interface FichaDeEquipo {
+  equipo: Equipo;
+  padre: Equipo | null;
+  subEquipos: EquipoDeLista[];
   intervenciones: Intervencion[];
-  repuestosCriticos: RepuestoCritico[];
+  /** El historial de sus sub-equipos (para verlo junto con el del principal). */
+  intervencionesSub: Intervencion[];
+  repuestos: RepuestoCritico[];
   manuales: Manual[];
-  rutinas: RutinaPreventiva[];
+  /** Sus rutinas preventivas y sus órdenes de trabajo abiertas. */
+  rutinas: Rutina[];
   ordenes: OrdenTrabajo[];
-  /** Descuentos de stock (modo de ejemplo). */
-  consumos: ConsumoStock[];
-  /** Planillas de tareas armadas de antemano. */
-  planillas: PlanillaTareas[];
-  /** Gastos de servicios externos, por equipo. */
-  gastosExternos: GastoExterno[];
-  config: ConfigMantenimiento;
-  /** Personas del módulo (modo de ejemplo). */
-  personas: PersonaMantenimiento[];
+  /** Los valores anotados en sus OT terminadas (de la más vieja a la más nueva), para ver cómo cambian. */
+  mediciones: ValorMedido[];
+  /** Los gastos de servicios externos del equipo y sus sub-equipos (para los costos). */
+  gastos: GastoExterno[];
+}
+
+/** Un valor anotado en una OT terminada. */
+export interface ValorMedido extends Medicion { tarea: string; valor: number; fecha: FechaISO; ot: number }
+
+/** Un repuesto del Depósito para elegir (buscador). */
+export interface RepuestoParaElegir { id: string; codigo: string; descripcion: string; stock: number | null; deposito: string | null }
+
+/** Lo que se guarda de un equipo (null en id = nuevo). */
+export interface EquipoInput {
+  id: string | null;
+  codigo: string;
+  nombre: string;
+  /** El sector y el sub-sector por su nombre (vacío = sin sector): si todavía no existen, se crean. */
+  sector: string;
+  subsector: string;
+  etiquetas: string[];
+  marca: string;
+  modelo: string;
+  numeroSerie: string;
+  ubicacion: string;
+  critico: boolean;
+  notas: string;
+  padreId: string | null;
+}
+
+export interface IntervencionInput {
+  id: string | null;
+  equipoId: string;
+  fecha: FechaISO;
+  tipo: TipoMantenimiento;
+  descripcion: string;
+  /** Los usuarios técnicos elegidos. */
+  tecnicos: string[];
+  horas: number | null;
+  repuestosUsados: string;
+  correctivo: DetalleCorrectivo | null;
+  /** Solo en preventivos: horas que el equipo estuvo parado (en los correctivos va en `correctivo`). */
+  horasParada?: number | null;
+}
+
+export interface DuplicarInput {
+  id: string;
+  codigo: string;
+  nombre: string;
+  numeroSerie: string;
 }

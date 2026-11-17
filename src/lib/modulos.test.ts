@@ -76,7 +76,7 @@ describe('efectivos', () => {
 });
 
 describe('integraciones', () => {
-  it('proveedores por repuesto necesitan Depósito y Proveedores', () => {
+  it('proveedores por artículo necesitan Depósito y Proveedores', () => {
     expect(integraciones(todos()).depositoConProveedores).toBe(true);
     expect(integraciones({ ...todos(), proveedores: false }).depositoConProveedores).toBe(false);
     expect(integraciones({ ...todos(), deposito: false }).depositoConProveedores).toBe(false);

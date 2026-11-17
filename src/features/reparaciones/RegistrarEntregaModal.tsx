@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { useAuth } from '../../auth/AuthContext';
-import { registrarErrorAccion } from '../../lib/errorLogging';
 import { fechaHoyISO } from '../../lib/fechaHoy';
-import { cantidadPendiente, useRegistrarEntrega, type ReparacionItemConDetalle } from './useReparaciones';
+import { useServicioDeReparaciones } from './servicioDeReparaciones';
+import { cantidadPendiente, queSeMandoEnTexto } from './estadoDeReparacion';
+import type { ReparacionItemConDetalle } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -17,8 +17,8 @@ interface Props {
 }
 
 export default function RegistrarEntregaModal({ linea, onClose }: Props) {
-  const { profile } = useAuth();
-  const registrar = useRegistrarEntrega();
+  const servicio = useServicioDeReparaciones();
+  const [guardando, setGuardando] = useState(false);
   const toast = useToast();
 
   const pendiente = linea ? cantidadPendiente(linea) : 0;
@@ -44,12 +44,13 @@ export default function RegistrarEntregaModal({ linea, onClose }: Props) {
   });
 
   async function handleGuardar() {
-    if (!linea || !profile) return;
+    if (!linea) return;
     const cant = parseInt(cantidad, 10);
     if (!(cant > 0)) { toast('Ingresá una cantidad mayor a 0', 'error'); return; }
     if (cant > pendiente) { toast(`No podés registrar más de ${pendiente}, es lo que queda pendiente`, 'error'); return; }
+    setGuardando(true);
     try {
-      await registrar.mutateAsync({
+      await servicio.registrarEntrega({
         reparacion_item_id: linea.id,
         cantidad_devuelta: cant,
         resultado,
@@ -57,14 +58,15 @@ export default function RegistrarEntregaModal({ linea, onClose }: Props) {
         remito_numero: numeroRemito.trim() || null,
         remito_fecha: fechaRemito || null,
         fecha_entrega: fechaEntrega,
-        registrado_por: profile.id,
-        repone_stock: resultado === 'reparado' && reponeStock,
+        repone_stock: resultado === 'reparado' && reponeStock && !!linea.item_id,
       });
       toast('Entrega registrada', 'success');
       onClose();
     } catch (err) {
-      await registrarErrorAccion('Error al registrar una entrega de reparación', err);
+      await servicio.registrarError('Error al registrar una entrega de reparación', err);
       toast('Error al registrar la entrega: ' + mensajeDeError(err), 'error');
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -72,12 +74,12 @@ export default function RegistrarEntregaModal({ linea, onClose }: Props) {
     <Modal
       open={!!linea}
       onClose={onClose}
-      title={linea ? `Registrar entrega — ${linea.items?.codigo}` : ''}
+      title={linea ? `Registrar entrega — ${linea.items?.codigo ?? queSeMandoEnTexto(linea)}` : ''}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="success" disabled={registrar.isPending} onClick={() => void handleGuardar()}>
-            {registrar.isPending ? 'Guardando...' : 'Guardar'}
+          <Button variant="success" disabled={guardando} onClick={() => void handleGuardar()}>
+            {guardando ? 'Guardando...' : 'Guardar'}
           </Button>
         </>
       }
@@ -104,7 +106,8 @@ export default function RegistrarEntregaModal({ linea, onClose }: Props) {
               <Input id="registrar-entrega-modal-3" type="date" value={fechaEntrega} onChange={e => setFechaEntrega(e.target.value)} />
             </div>
             <div className="form-group">
-              {resultado === 'reparado' && (
+              {/* lo que no está en el depósito no tiene stock al que volver */}
+              {resultado === 'reparado' && !!linea.item_id && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-mid)', cursor: 'pointer', marginTop: 22 }} title="Destildalo si va directo a instalarse en vez de volver al depósito">
                   <input type="checkbox" checked={reponeStock} onChange={e => setReponeStock(e.target.checked)} />
                   Sumar al stock

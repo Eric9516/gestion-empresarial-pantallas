@@ -1,10 +1,8 @@
 allowBuilds:
-  '@sentry/cli': true
   core-js: false
-  # PostgreSQL real que se baja como paquete (para las pruebas de concurrencia): su instalación arma los archivos del programa.
-  '@embedded-postgres/windows-x64': true
-  '@embedded-postgres/linux-x64': true
-  '@embedded-postgres/darwin-arm64': true
-  '@embedded-postgres/darwin-x64': true
 overrides:
   source-map-js: '>=1.2.2'
+# Una versión nueva de una librería recién se instala a los 7 días de publicada: si la publicó alguien que robó la cuenta del autor
+# (ya pasó con librerías muy usadas), en ese tiempo se descubre y se retira. Para un arreglo urgente, se agrega la librería a
+# minimumReleaseAgeExclude.
+minimumReleaseAge: 10080

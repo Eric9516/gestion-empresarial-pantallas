@@ -1,4 +1,4 @@
-import type { Tarea } from './useTareas';
+import type { Tarea } from './tipos';
 
 interface Props {
   tareas: Tarea[];

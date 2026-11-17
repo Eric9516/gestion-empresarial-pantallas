@@ -1,15 +1,13 @@
 import { useMemo, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
 import { fechaHoyISO } from '../../lib/fechaHoy';
 import { abrirPdfBlob, descargarPdfBlob } from '../../lib/pdfBlob';
 import { generarPedidoBlob, type LineaPedido } from '../../lib/pedidoPdf';
-import { useConfiguracionQuery } from '../config/useConfiguracion';
-import { NOMBRE_EMPRESA_POR_DEFECTO } from '../../lib/empresa';
-import { useProveedoresQuery } from '../proveedores/useProveedores';
+import type { LetraPdf } from '../../lib/preferencias';
 import { cantidadAComprar } from './reposicion';
-import { useRepuestosParaElegir, type Item } from './useItems';
+import type { Item } from './tipos';
+import { useRepuestosQueCoinciden, type BuscarRepuestos } from './useRepuestosQueCoinciden';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,11 +17,22 @@ import { Icono } from '@/components/Icono';
 // De cada repuesto el pedido necesita solo esto (sirve tanto con el repuesto completo como con un resultado de búsqueda).
 export type RepuestoParaPedido = Pick<Item, 'id' | 'codigo' | 'descripcion' | 'stock' | 'stock_minimo' | 'punto_pedido'>;
 
+/** Lo que la solicitud necesita de afuera; cada app lo pone a su manera (Supabase en la de Vite, el servidor en la de Next). */
+export interface DatosDelPedido {
+  empresa: { nombre: string; logo: string };
+  letraPdf: LetraPdf;
+  /** Los nombres de los proveedores, para elegir a quién va la solicitud. */
+  proveedores: string[];
+  buscarRepuestos: BuscarRepuestos;
+  registrarError: (descripcion: string, err: unknown) => Promise<void>;
+}
+
 interface Props {
   items: RepuestoParaPedido[];
   onClose: () => void;
   // Se llama al descargar, con los repuestos que quedaron en el pedido.
   onDescargado?: (ids: string[]) => void;
+  datos: DatosDelPedido;
 }
 
 interface LineaEditable extends LineaPedido { id: string }
@@ -35,11 +44,11 @@ const MAX_SUGERENCIAS = 6;
 
 // Suma a la lista un repuesto cualquiera del sistema (buscando entre todos, no
 // solo los del informe) o una línea en blanco para escribir a mano.
-function AgregarLinea({ yaAgregados, onAgregarItem, onAgregarManual }: {
-  yaAgregados: Set<string>; onAgregarItem: (it: RepuestoParaPedido) => void; onAgregarManual: () => void;
+function AgregarLinea({ yaAgregados, onAgregarItem, onAgregarManual, buscar }: {
+  yaAgregados: Set<string>; onAgregarItem: (it: RepuestoParaPedido) => void; onAgregarManual: () => void; buscar: BuscarRepuestos;
 }) {
   const [busqueda, setBusqueda] = useState('');
-  const encontrados = useRepuestosParaElegir(busqueda.trim().length < 2 ? '' : busqueda, MAX_SUGERENCIAS + 12);
+  const encontrados = useRepuestosQueCoinciden(busqueda.trim().length < 2 ? '' : busqueda, buscar, MAX_SUGERENCIAS + 12);
 
   const sugerencias = useMemo(() => encontrados.filter(it => !yaAgregados.has(it.id)).slice(0, MAX_SUGERENCIAS), [encontrados, yaAgregados]);
 
@@ -66,10 +75,8 @@ function AgregarLinea({ yaAgregados, onAgregarItem, onAgregarManual }: {
 
 // Se edita todo antes de generar el PDF: descripción, código, cantidad, quitar
 // líneas. Nada de esto se guarda en los repuestos — vale solo para este pedido.
-export default function PedidoModal({ items, onClose, onDescargado }: Props) {
+export default function PedidoModal({ items, onClose, onDescargado, datos }: Props) {
   const toast = useToast();
-  const { data: config } = useConfiguracionQuery();
-  const { data: proveedores } = useProveedoresQuery();
 
   const [lineas, setLineas] = useState<LineaEditable[]>(() =>
     items.map(it => ({ id: it.id, codigo: it.codigo, descripcion: it.descripcion, cantidad: String(cantidadAComprar(it)) }))
@@ -97,8 +104,9 @@ export default function PedidoModal({ items, onClose, onDescargado }: Props) {
   async function generar(): Promise<Blob | null> {
     try {
       return await generarPedidoBlob({
-        empresa: config?.empresa_nombre || NOMBRE_EMPRESA_POR_DEFECTO,
-        logo: config?.logo_base64 || '',
+        letra: datos.letraPdf,
+        empresa: datos.empresa.nombre,
+        logo: datos.empresa.logo,
         fecha, para, nota, incluirCodigo,
         // Una línea manual que quedó totalmente vacía no se imprime.
         lineas: lineas
@@ -106,7 +114,7 @@ export default function PedidoModal({ items, onClose, onDescargado }: Props) {
           .map(({ codigo, descripcion, cantidad }) => ({ codigo, descripcion, cantidad })),
       });
     } catch (err) {
-      await registrarErrorAccion('Error al generar el PDF de la solicitud de presupuesto', err);
+      await datos.registrarError('Error al generar el PDF de la solicitud de presupuesto', err);
       toast('No se pudo generar el PDF: ' + mensajeDeError(err), 'error');
       return null;
     }
@@ -142,7 +150,7 @@ export default function PedidoModal({ items, onClose, onDescargado }: Props) {
       }
     >
       <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-        Editá lo que necesites: los cambios valen solo para esta solicitud y no modifican los repuestos.
+        Editá lo que necesites: los cambios valen solo para esta solicitud y no modifican los artículos.
       </p>
 
       <div className="form-grid">
@@ -150,7 +158,7 @@ export default function PedidoModal({ items, onClose, onDescargado }: Props) {
           <label htmlFor="pedido-modal-1">Para (proveedor)</label>
           <Input id="pedido-modal-1" list="pedido-proveedores" placeholder="Escribí o elegí un proveedor" value={para} onChange={e => setPara(e.target.value)} />
           <datalist id="pedido-proveedores">
-            {proveedores?.map(p => <option key={p.id} value={p.nombre} />)}
+            {datos.proveedores.map(nombre => <option key={nombre} value={nombre} />)}
           </datalist>
         </div>
         <div className="form-group">
@@ -168,7 +176,7 @@ export default function PedidoModal({ items, onClose, onDescargado }: Props) {
         Incluir una columna con el código
       </label>
 
-      <AgregarLinea yaAgregados={yaAgregados} onAgregarItem={agregarItem} onAgregarManual={agregarManual} />
+      <AgregarLinea yaAgregados={yaAgregados} onAgregarItem={agregarItem} onAgregarManual={agregarManual} buscar={datos.buscarRepuestos} />
 
       {sinLineas && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No quedan artículos en la solicitud.</p>}
 

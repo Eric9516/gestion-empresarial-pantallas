@@ -73,6 +73,11 @@ input[type="file"] { display: none; }
 .user-dropdown-item:hover { background: var(--surface2); color: var(--text); }
 .user-dropdown-item.user-dropdown-danger { color: var(--danger); }
 .user-dropdown-item.user-dropdown-danger:hover { background: var(--danger-bg); }
+.user-dropdown-item:disabled { opacity: 0.5; cursor: default; background: none; }
+/* Menú "⋯": un separador, el título de un grupo de opciones y la marca de la elegida. */
+.user-dropdown-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+.user-dropdown-grupo { padding: 8px 12px 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: var(--text-muted); }
+.user-dropdown-marca { margin-left: auto; color: var(--primary, var(--blue)); }
 
 /* ===== PROFILE AVATAR ===== */
 
@@ -84,3 +89,16 @@ input[type="file"] { display: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #b0bec5; }
+
+/* ===== Texto copiable: el botón casi no se ve; aparece al pasar el mouse por la fila, la tarjeta o el dato ===== */
+.copiable { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; }
+.copiar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 22px; height: 22px; padding: 0; border: none; border-radius: 6px; background: none;
+  color: var(--text-muted); font-size: 13px; cursor: pointer; opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+tr:hover .copiar, .prov-card:hover .copiar, .detail-item:hover .copiar, .detail-section:hover .copiar, .copiable:hover .copiar { opacity: 0.6; }
+.copiar:hover { opacity: 1 !important; background: var(--surface2); color: var(--text); }
+.copiar:focus-visible { opacity: 1; }
+.copiar.copiado { opacity: 1; color: var(--success, var(--green)); }
+@media (hover: none) { .copiar { opacity: 0.4; } }

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { useExportarRetirosPeriodo } from './useRetiros';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { mensajeDeError } from '@/lib/errores';
@@ -11,11 +10,12 @@ import { Icono } from '@/components/Icono';
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Exporta los retiros entre esas fechas; devuelve cuántos salieron. */
+  exportar: (desde: string, hasta: string) => Promise<number>;
 }
 
-export default function ExportarPeriodoModal({ open, onClose }: Props) {
+export default function ExportarPeriodoModal({ open, onClose, exportar }: Props) {
   const toast = useToast();
-  const exportarPeriodo = useExportarRetirosPeriodo();
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [saving, setSaving] = useState(false);
@@ -26,7 +26,7 @@ export default function ExportarPeriodoModal({ open, onClose }: Props) {
     if (!desde || !hasta) { toast('Elegí las dos fechas', 'error'); return; }
     setSaving(true);
     try {
-      const cantidad = await exportarPeriodo.mutateAsync({ desde, hasta });
+      const cantidad = await exportar(desde, hasta);
       if (!cantidad) { toast('No hay retiros para exportar', 'error'); return; }
       onClose();
     } catch (e) {

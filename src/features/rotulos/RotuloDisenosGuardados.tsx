@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import {
-  useEliminarModeloRotulo, useRotuloDisenosQuery, useUsarModeloRotulo, type RotuloDiseno,
-} from './useRotuloDiseno';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeConfiguracion } from '../admin/servicioDeConfiguracion';
+import type { RotuloDiseno } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icono } from '@/components/Icono';
@@ -16,9 +16,8 @@ interface Props {
 }
 
 export default function RotuloDisenosGuardados({ disenoActivoId, onGuardarComoModelo }: Props) {
-  const { data: modelos } = useRotuloDisenosQuery();
-  const usarModelo = useUsarModeloRotulo();
-  const eliminarModelo = useEliminarModeloRotulo();
+  const { rotulo } = useServicioDeConfiguracion();
+  const { data: modelos, recargar } = usePedido('modelos', rotulo.modelos, true);
   const toast = useToast();
   const confirmar = useConfirm();
   const [nombre, setNombre] = useState('');
@@ -29,6 +28,7 @@ export default function RotuloDisenosGuardados({ disenoActivoId, onGuardarComoMo
     setGuardando(true);
     try {
       await onGuardarComoModelo(nombre.trim());
+      recargar();
       setNombre('');
       toast('Modelo guardado', 'success');
     } catch {
@@ -40,7 +40,7 @@ export default function RotuloDisenosGuardados({ disenoActivoId, onGuardarComoMo
 
   async function handleUsar(modelo: RotuloDiseno) {
     try {
-      await usarModelo.mutateAsync(modelo);
+      await rotulo.usarModelo(modelo);
       toast(`"${modelo.nombre}" ahora es el predeterminado`, 'success');
     } catch {
       toast('Error al aplicar el modelo', 'error');
@@ -50,7 +50,8 @@ export default function RotuloDisenosGuardados({ disenoActivoId, onGuardarComoMo
   async function handleEliminar(modelo: RotuloDiseno) {
     if (!(await confirmar(`¿Eliminar el modelo "${modelo.nombre}"? Esta acción no se puede deshacer.`, { textoConfirmar: 'Eliminar', peligroso: true }))) return;
     try {
-      await eliminarModelo.mutateAsync(modelo.id);
+      await rotulo.eliminarModelo(modelo.id);
+      recargar();
       toast('Modelo eliminado', 'error');
     } catch {
       toast('Error al eliminar el modelo', 'error');

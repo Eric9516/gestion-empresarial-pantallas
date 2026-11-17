@@ -3,7 +3,8 @@ import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { generarQRPDF, type FormatoEtiqueta } from '../../lib/generarQrPdf';
 import FormatoEtiquetaSelect from './FormatoEtiquetaSelect';
-import { useRepuestosParaElegir } from './useItems';
+import { useServicioDeConfiguracion } from '../admin/servicioDeConfiguracion';
+import { useRepuestosQueCoinciden } from './useRepuestosQueCoinciden';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icono } from '@/components/Icono';
@@ -24,7 +25,8 @@ export default function GenerarQrModal({ open, onClose }: { open: boolean; onClo
   const [pendiente, setPendiente] = useState<{ item_id: string; codigo: string; descripcion: string } | null>(null);
   const [cantidadInput, setCantidadInput] = useState('1');
 
-  const resultados = useRepuestosParaElegir(busqueda);
+  const { repuestos } = useServicioDeConfiguracion();
+  const resultados = useRepuestosQueCoinciden(busqueda, repuestos.buscar);
 
   function handleClose() {
     setBusqueda('');
@@ -61,7 +63,7 @@ export default function GenerarQrModal({ open, onClose }: { open: boolean; onClo
   }
 
   function handleGenerar() {
-    if (!seleccion.length) { toast('Agregá al menos un repuesto', 'error'); return; }
+    if (!seleccion.length) { toast('Agregá al menos un artículo', 'error'); return; }
     const items = seleccion.flatMap(s => Array(s.cantidad).fill({ codigo: s.codigo, descripcion: s.descripcion }));
     void generarQRPDF(items, `qr_repuestos_${new Date().toISOString().slice(0, 10)}.pdf`, formato);
     handleClose();
@@ -82,7 +84,7 @@ export default function GenerarQrModal({ open, onClose }: { open: boolean; onClo
         }
       >
         <div className="form-group full" style={{ marginBottom: 12 }}>
-          <label htmlFor="generar-qr-modal-1">Buscar repuesto</label>
+          <label htmlFor="generar-qr-modal-1">Buscar artículo</label>
           <Input id="generar-qr-modal-1" type="text" placeholder="Código o descripción..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
         </div>
         {busqueda.trim() && (
@@ -99,7 +101,7 @@ export default function GenerarQrModal({ open, onClose }: { open: boolean; onClo
         <FormatoEtiquetaSelect value={formato} onChange={setFormato} />
 
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Seleccionados</div>
-        {!seleccion.length && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Todavía no agregaste ningún repuesto.</p>}
+        {!seleccion.length && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Todavía no agregaste ningún artículo.</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {seleccion.map(s => (
             <div key={s.item_id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

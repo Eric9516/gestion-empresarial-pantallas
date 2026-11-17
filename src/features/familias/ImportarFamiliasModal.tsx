@@ -1,16 +1,17 @@
 import { useRef, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
-import { analizarExcelFamilias, useAplicarImportacionFamilias, useSubirPlanillaFamilias, type AnalisisFamilias } from './useImportarFamilias';
+import { useServicioDeConfiguracion } from '../admin/servicioDeConfiguracion';
+import { analizarExcelFamilias, type AnalisisFamilias } from './importarFamilias';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
-export default function ImportarFamiliasModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** `onImportado`: se guardó (para volver a leer las familias). */
+export default function ImportarFamiliasModal({ open, onClose, onImportado }: { open: boolean; onClose: () => void; onImportado?: () => void }) {
   const toast = useToast();
-  const aplicar = useAplicarImportacionFamilias();
-  const subirPlanilla = useSubirPlanillaFamilias();
+  const { familias, registrarError } = useServicioDeConfiguracion();
+  const [cargando, setCargando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [analizando, setAnalizando] = useState(false);
@@ -44,10 +45,10 @@ export default function ImportarFamiliasModal({ open, onClose }: { open: boolean
     setAnalisis(null);
     setReemplazar(new Set());
     try {
-      const resultado = await analizarExcelFamilias(file);
+      const resultado = await analizarExcelFamilias(file, await familias.datosParaImportar());
       setAnalisis(resultado);
     } catch (err) {
-      await registrarErrorAccion('Error al leer el Excel de familias/subfamilias', err);
+      await registrarError('Error al leer el Excel de familias/subfamilias', err);
       toast('No se pudo leer el archivo. Verificá que sea el Excel correcto.', 'error');
     } finally {
       setAnalizando(false);
@@ -68,26 +69,29 @@ export default function ImportarFamiliasModal({ open, onClose }: { open: boolean
         .filter(s => reemplazar.has(`s:${s.familiaCodigo}${s.codigo}`))
         .map(s => ({ id: s.id, familiaId: s.familiaId, codigo: s.codigo, nombre: s.nombreExcel })),
     ];
+    setCargando(true);
     try {
-      await aplicar.mutateAsync({
+      await familias.importar({
         familiasNuevas: analisis.familiasNuevas,
         familiasCompletar,
         subfamiliasNuevas: analisis.subfamiliasNuevas,
         subfamiliasCompletar,
       });
-      await subirPlanilla.mutateAsync(archivo);
+      await familias.subirPlanilla(archivo);
+      onImportado?.();
       toast(
         `Listo: ${analisis.familiasNuevas.length + analisis.subfamiliasNuevas.length} nuevas, ${familiasCompletar.length + subfamiliasCompletar.length} nombres actualizados.`,
         'success',
       );
       handleClose();
     } catch (err) {
-      await registrarErrorAccion('Error al importar familias/subfamilias desde Excel', err);
+      await registrarError('Error al importar familias/subfamilias desde Excel', err);
       toast('Error al guardar los cambios: ' + mensajeDeError(err), 'error');
+    } finally {
+      setCargando(false);
     }
   }
 
-  const cargando = aplicar.isPending || subirPlanilla.isPending;
   const totalCambios = analisis
     ? analisis.familiasNuevas.length + analisis.subfamiliasNuevas.length + analisis.familiasCompletar.length + analisis.subfamiliasCompletar.length + reemplazar.size
     : 0;

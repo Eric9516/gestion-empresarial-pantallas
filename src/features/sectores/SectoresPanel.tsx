@@ -1,7 +1,9 @@
 import { useRef, useState, type FocusEvent, type FormEvent } from 'react';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { useAddSector, useDeleteSector, useRenameSector, useSectoresQuery, useToggleSectorActivo, type Sector } from './useSectores';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeConfiguracion } from '../admin/servicioDeConfiguracion';
+import type { Sector } from './tipos';
 import { useMenu } from '../../lib/useMenu';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,11 +28,12 @@ function SectorMenu({ sector, onModificar, onToggle, onDelete }: { sector: Secto
 }
 
 export default function SectoresPanel() {
-  const { data: sectores, isLoading, isError } = useSectoresQuery();
-  const addSector = useAddSector();
-  const renameSector = useRenameSector();
-  const toggleActivo = useToggleSectorActivo();
-  const deleteSector = useDeleteSector();
+  const { sectores: servicio } = useServicioDeConfiguracion();
+  const pedido = usePedido('sectores', servicio.leer, true);
+  const sectores = pedido.data;
+  const isLoading = sectores === undefined && !pedido.error;
+  const isError = !!pedido.error;
+  const [agregando, setAgregando] = useState(false);
   const toast = useToast();
   const confirmar = useConfirm();
 
@@ -47,12 +50,16 @@ export default function SectoresPanel() {
       toast('Ya existe un sector con ese nombre', 'error');
       return;
     }
+    setAgregando(true);
     try {
-      await addSector.mutateAsync(nombreLimpio);
+      await servicio.agregar(nombreLimpio);
       setNombre('');
+      pedido.recargar();
       toast('Sector agregado', 'success');
     } catch (e) {
       toast('Error al agregar: ' + mensajeDeError(e), 'error');
+    } finally {
+      setAgregando(false);
     }
   }
 
@@ -60,7 +67,8 @@ export default function SectoresPanel() {
     const nuevoNombre = e.target.value.trim();
     if (!nuevoNombre || nuevoNombre === sector.nombre) return;
     try {
-      await renameSector.mutateAsync({ id: sector.id, nombre: nuevoNombre });
+      await servicio.renombrar(sector.id, nuevoNombre);
+      pedido.recargar();
       setSavedId(sector.id);
       window.clearTimeout(savedTimeout.current);
       savedTimeout.current = window.setTimeout(() => setSavedId(null), 900);
@@ -71,7 +79,8 @@ export default function SectoresPanel() {
 
   async function handleToggle(sector: Sector) {
     try {
-      await toggleActivo.mutateAsync({ id: sector.id, activo: !sector.activo });
+      await servicio.activar(sector.id, !sector.activo);
+      pedido.recargar();
     } catch {
       toast('Error al actualizar el sector', 'error');
     }
@@ -80,7 +89,8 @@ export default function SectoresPanel() {
   async function handleDelete(sector: Sector) {
     if (!(await confirmar(`¿Eliminar el sector "${sector.nombre}"? Esta acción no se puede deshacer.`, { textoConfirmar: 'Eliminar', peligroso: true }))) return;
     try {
-      await deleteSector.mutateAsync(sector.id);
+      await servicio.eliminar(sector.id);
+      pedido.recargar();
       toast('Sector eliminado', 'success');
     } catch (e) {
       const esConflictoDeUso = (e as { code?: string })?.code === '23503';
@@ -102,7 +112,7 @@ export default function SectoresPanel() {
         </div>
         <form onSubmit={handleAdd} style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <Input type="text" placeholder="Ej: Producción" value={nombre} onChange={e => setNombre(e.target.value)} />
-          <Button type="submit" variant="primary" size="sm" disabled={addSector.isPending}>Agregar</Button>
+          <Button type="submit" variant="primary" size="sm" disabled={agregando}>Agregar</Button>
         </form>
 
         {isLoading && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cargando...</p>}

@@ -1,6 +1,6 @@
 import Modal from '../../components/Modal';
-import { useCamposCustomQuery } from '../config/useCamposCustom';
-import type { Comisionista } from './useComisionistas';
+import type { CampoCustom } from '../config/camposCustom';
+import type { Comisionista } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 import type { ReactNode } from 'react';
@@ -20,15 +20,15 @@ interface Props {
   onClose: () => void;
   // Sin onEdit es una vista de solo lectura (usuario común, no admin de Directorio).
   onEdit?: () => void;
+  camposCustom: CampoCustom[];
 }
 
-export default function ComisionistaDetail({ comisionista, onClose, onEdit }: Props) {
-  const { data: camposCustom } = useCamposCustomQuery();
+export default function ComisionistaDetail({ comisionista, onClose, onEdit, camposCustom }: Props) {
   if (!comisionista) return null;
 
   const fecha = comisionista.updated_at ? new Date(comisionista.updated_at).toLocaleDateString('es-AR') : '—';
   const camposExtra = (comisionista.campos_extra as Record<string, string> | null) ?? {};
-  const conValor = (camposCustom ?? []).filter(c => camposExtra[c.id]);
+  const conValor = camposCustom.filter(c => camposExtra[c.id]);
 
   return (
     <Modal

@@ -4,20 +4,15 @@ import Modal from '../../components/Modal';
 import SizeSelector from '../../components/SizeSelector';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { getCurrentCampos, getCurrentDesign } from '../../lib/rotuloDesign';
-import { useComisionistasQuery } from '../comisionistas/useComisionistas';
-import { useConfiguracionQuery } from '../config/useConfiguracion';
-import { NOMBRE_EMPRESA_POR_DEFECTO } from '../../lib/empresa';
-import { useProveedoresQuery } from '../proveedores/useProveedores';
+import { usePedido } from '../../lib/usePedido';
 import RotuloBultosFields from './RotuloBultosFields';
 import RotuloDescargas from './RotuloDescargas';
 import RotuloPreview from './RotuloPreview';
-import { useGuardarRotulo, useRotuloParaEditarQuery, type RotuloGuardado } from './useRotulos';
+import { useServicioDeEnvios, type EnvioConBultos } from './servicioDeEnvios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useModulos } from '../config/useModulos';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 import type { ReactNode } from 'react';
@@ -38,12 +33,9 @@ const TIPOS_DOC = [
 export default function RotuloForm({ open, onClose, proveedorId, editingId }: Props) {
   const toast = useToast();
   const confirmar = useConfirm();
-  const { data: config } = useConfiguracionQuery();
-  const { data: proveedores } = useProveedoresQuery();
-  const { data: comisionistas } = useComisionistasQuery();
-  const { integ } = useModulos();
-  const { data: editData } = useRotuloParaEditarQuery(editingId);
-  const guardarRotulo = useGuardarRotulo();
+  const servicio = useServicioDeEnvios();
+  const { diseno, proveedores, comisionistas, conComisionistas } = servicio;
+  const { data: editData } = usePedido(open && editingId ? editingId : null, () => servicio.leerEnvio(editingId!));
 
   const [w, setW] = useState(21);
   const [h, setH] = useState(29.7);
@@ -55,7 +47,7 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
   const [bultosDetalle, setBultosDetalle] = useState<string[]>(['']);
   const [extra, setExtra] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [descargas, setDescargas] = useState<RotuloGuardado | null>(null);
+  const [descargas, setDescargas] = useState<EnvioConBultos | null>(null);
   const [saving, setSaving] = useState(false);
 
   useAlCambiar([open, editingId, editData], () => {
@@ -99,12 +91,12 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
   async function handleGuardar() {
     if (!proveedor) return;
     if (editingId && !motivo.trim()) { toast('Contá el motivo de la edición antes de guardar', 'error'); return; }
-    if (integ.enviosConComisionistas && !comisionistaId && !(await confirmar('No seleccionaste un comisionista para este envío. ¿Guardar igual?', { textoConfirmar: 'Guardar igual' }))) return;
+    if (conComisionistas && !comisionistaId && !(await confirmar('No seleccionaste un comisionista para este envío. ¿Guardar igual?', { textoConfirmar: 'Guardar igual' }))) return;
 
     setSaving(true);
     try {
-      const guardado = await guardarRotulo.mutateAsync({
-        proveedor, contactos: proveedor.contactos,
+      const guardado = await servicio.guardar({
+        proveedorId: proveedor.id,
         w: w * 10, h: h * 10,
         bultosDetalle, extra,
         docInfo: { tipoDoc, numDoc, valorDeclarado, comisionistaId },
@@ -120,10 +112,7 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
     }
   }
 
-  if (!proveedor) return null;
-
-  const design = getCurrentDesign(config?.rotulo_design);
-  const campos = getCurrentCampos(config?.rotulo_campos);
+  if (!proveedor || !diseno) return null;
 
   return (
     <Modal open={open} onClose={onClose} title={<><span className="accent"><Icono n="etiqueta" /></span> Editor de Rótulo</>} large>
@@ -135,7 +124,7 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
           </div>
 
           <Separador texto={<><Icono n="lista" /> Envío</>} />
-          {integ.enviosConComisionistas && <div className="form-group">
+          {conComisionistas && <div className="form-group">
             <label htmlFor="rotulo-form-1">Comisionista (opcional — solo para control interno, no se imprime)</label>
             <Select id="rotulo-form-1" value={comisionistaId} onChange={e => setComisionistaId(e.target.value)}>
               <option value="">Sin comisionista</option>
@@ -166,7 +155,7 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
             />
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Se genera un PDF distinto por cada bulto, cada uno con su propia descripción.</div>
           </div>
-          <RotuloBultosFields detalles={bultosDetalle} onChange={setBultosDetalle} />
+          <RotuloBultosFields detalles={bultosDetalle} onChange={setBultosDetalle} buscarArticulos={servicio.buscarArticulos} />
 
           <Separador texto={<><Icono n="nota" /> Notas</>} />
           <div className="form-group" style={{ marginBottom: 0 }}>
@@ -185,7 +174,7 @@ export default function RotuloForm({ open, onClose, proveedorId, editingId }: Pr
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--text-muted)', marginBottom: 10 }}>Vista previa (bulto 1)</div>
           <div style={{ background: '#d0d0d0', borderRadius: 10, padding: 16 }}>
             <RotuloPreview
-              design={design} campos={campos} pie={config?.rotulo_pie || ''} empresa={config?.empresa_nombre || NOMBRE_EMPRESA_POR_DEFECTO} logo={config?.logo_base64 || ''}
+              design={diseno.design} campos={diseno.campos} pie={diseno.pie} empresa={diseno.empresa} logo={diseno.logo}
               proveedor={proveedor} contactos={proveedor.contactos} detalle={bultosDetalle[0] || ''} extra={extra}
               docInfo={{ tipoDoc, numDoc, valorDeclarado, bultoN: bultosDetalle.length > 1 ? '1' : '', bultoTotal: bultosDetalle.length > 1 ? String(bultosDetalle.length) : '' }}
             />

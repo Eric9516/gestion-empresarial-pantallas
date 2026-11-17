@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Modal from '../../components/Modal';
 import { generarQRPDF, type FormatoEtiqueta } from '../../lib/generarQrPdf';
 import FormatoEtiquetaSelect from './FormatoEtiquetaSelect';
-import type { Item } from './useItems';
+import type { Item } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 

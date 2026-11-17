@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { useResetPasswordUsuario } from './useUsuarios';
-import type { Usuario } from './useUsuarios';
+import { useServicioDeUsuarios } from './servicioDeConfiguracion';
+import type { Usuario } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { mensajeDeError } from '@/lib/errores';
@@ -17,7 +17,7 @@ interface Props {
 
 export default function ResetPasswordModal({ open, onClose, usuario }: Props) {
   const toast = useToast();
-  const resetPassword = useResetPasswordUsuario();
+  const { usuarios } = useServicioDeUsuarios();
   const [password, setPassword] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -28,7 +28,7 @@ export default function ResetPasswordModal({ open, onClose, usuario }: Props) {
     if (password.length < LARGO_MINIMO_CLAVE) { toast(`La contraseña debe tener al menos ${LARGO_MINIMO_CLAVE} caracteres`, 'error'); return; }
     setSaving(true);
     try {
-      await resetPassword.mutateAsync({ id: usuario.id, password });
+      await usuarios.cambiarContrasena(usuario.id, password);
       toast('Contraseña actualizada', 'success');
       onClose();
     } catch (e) {

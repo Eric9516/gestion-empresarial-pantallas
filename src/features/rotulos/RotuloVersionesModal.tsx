@@ -1,5 +1,6 @@
 import Modal from '../../components/Modal';
-import { useRotuloVersionesQuery } from './useRotulos';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeEnvios } from './servicioDeEnvios';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 
@@ -11,7 +12,11 @@ interface Props {
 }
 
 export default function RotuloVersionesModal({ open, onClose, grupoId, onVerBultos }: Props) {
-  const { data: versiones, isLoading, isError } = useRotuloVersionesQuery(grupoId);
+  const { versiones: leerVersiones } = useServicioDeEnvios();
+  const pedido = usePedido(open && grupoId ? grupoId : null, () => leerVersiones(grupoId!));
+  const versiones = pedido.data;
+  const isLoading = pedido.cargando && !versiones;
+  const isError = !!pedido.error;
 
   return (
     <Modal open={open} onClose={onClose} title={<><span className="accent"><Icono n="reloj" /></span> Historial de versiones</>}>

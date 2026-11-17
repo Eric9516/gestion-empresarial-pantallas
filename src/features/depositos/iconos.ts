@@ -11,3 +11,6 @@ export const ICONO_DEPOSITO_POR_DEFECTO: NombreIcono = 'deposito';
 export function iconoDeDeposito(nombre: string | null | undefined): NombreIcono {
   return (ICONOS_DEPOSITO as readonly string[]).includes(nombre ?? '') ? (nombre as NombreIcono) : ICONO_DEPOSITO_POR_DEFECTO;
 }
+
+/** Cómo se llama el depósito mientras no se sabe cuál es (o si la base todavía no tiene la tabla). */
+export const NOMBRE_DEPOSITO_POR_DEFECTO = 'Depósito';

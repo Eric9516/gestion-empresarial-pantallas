@@ -7,8 +7,9 @@
   --blue-light: #2d6bc4;
   --red: #c8222a;
   --red-light: #e03038;
-  --deposito: #9a5b12;
-  --deposito-mid: #c17a1e;
+  /* los depósitos nacen con el azul de la app; cada uno puede elegir otro (Configuración → Depósito → Depósitos) */
+  --deposito: #1a3a6b;
+  --deposito-mid: #1e4d9b;
   --white: #ffffff;
   --bg: #f0f4f8;
   --surface: #ffffff;

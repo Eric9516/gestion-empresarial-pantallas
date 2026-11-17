@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+// (import.meta.glob lo da Vite, que es lo que usan las pruebas por debajo)
 import { describe, expect, it } from 'vitest';
 
 // Los íconos de la app salen todos de `components/Icono.tsx`. Un emoji o un símbolo suelto como ícono (✓, ⋮, ●, 🔧…) se

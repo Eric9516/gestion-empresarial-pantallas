@@ -3,7 +3,7 @@ import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { fechaHoyISO } from '../../lib/fechaHoy';
-import { useReprogramarTarea } from './useTareas';
+import { useServicioDeTareas } from './servicioDeTareas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { mensajeDeError } from '@/lib/errores';
@@ -18,7 +18,7 @@ interface Props {
 
 export default function ReprogramarModal({ open, onClose, taskId, onReprogramada }: Props) {
   const toast = useToast();
-  const reprogramar = useReprogramarTarea();
+  const servicio = useServicioDeTareas();
   const [fecha, setFecha] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -29,7 +29,7 @@ export default function ReprogramarModal({ open, onClose, taskId, onReprogramada
     if (!fecha) { toast('Seleccioná una fecha', 'error'); return; }
     setSaving(true);
     try {
-      await reprogramar.mutateAsync({ taskId, fecha });
+      await servicio.reprogramar(taskId, fecha);
       toast('Tarea reprogramada', 'success');
       onClose();
       onReprogramada();

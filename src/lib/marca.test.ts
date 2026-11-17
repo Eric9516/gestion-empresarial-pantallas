@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COLOR_DEPOSITO_ORIGINAL, COLOR_PRIMARIO_ORIGINAL, aplicarMarca, contrasteConBlanco, derivarPaleta, esColorValido, textoLegibleConBlanco,
+  COLOR_DEPOSITO_ORIGINAL, COLOR_PRIMARIO_ORIGINAL, aplicarMarca, contrasteConBlanco, derivarPaleta, esColorValido, textoLegibleConBlanco, variablesDeMarca,
 } from './marca';
 
 function raizFalsa() {
@@ -86,5 +86,20 @@ describe('aplicarMarca', () => {
     aplicarMarca(r, { primario: '#0a6e4f' });
     expect(r.puestas.has('--blue')).toBe(true);
     expect(r.puestas.has('--deposito')).toBe(false);
+  });
+});
+
+describe('colores de la pantalla (app de Next)', () => {
+  it('sin colores elegidos no pone nada: todo queda con el azul de la app, también los depósitos', () => {
+    expect(variablesDeMarca({})).toEqual({});
+    expect(COLOR_DEPOSITO_ORIGINAL).toBe(COLOR_PRIMARIO_ORIGINAL);
+  });
+  it('el color del depósito se usa en su cabecera; sin uno propio, toma el de la empresa', () => {
+    expect(variablesDeMarca({ deposito: '#7a2a8a' })['--deposito']).toBe('#7a2a8a');
+    const conEmpresa = variablesDeMarca({ primario: '#0f766e' });
+    expect(conEmpresa['--blue']).toBe('#0f766e');
+    expect(conEmpresa['--deposito']).toBe('#0f766e');
+    expect(variablesDeMarca({ primario: '#0f766e', deposito: '#7a2a8a' })['--deposito']).toBe('#7a2a8a');
+    expect(variablesDeMarca({ deposito: 'rojo' })).toEqual({});
   });
 });

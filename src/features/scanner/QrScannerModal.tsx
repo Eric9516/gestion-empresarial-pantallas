@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from '../../components/Modal';
-import { buscarRepuestoPorCodigo } from '../items/useItems';
 import { useRetiroCart } from '../retiros/RetiroCartContext';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 import type { ReactNode } from 'react';
 
-const MENSAJE_INICIAL = 'Apuntá al código QR del repuesto...';
+const MENSAJE_INICIAL = 'Apuntá al código QR del artículo...';
+
+export interface ArticuloEscaneado { id: string; codigo: string; descripcion: string }
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onListo: () => void; // "Listo, ver lista completa" — el padre decide a qué pestaña ir
+  /** Busca el artículo por su código (cada app a su manera: Supabase en la de Vite, el servidor en la de Next). */
+  buscarPorCodigo: (codigo: string) => Promise<ArticuloEscaneado | null>;
+  /** 'retirar' (lo de siempre): cada QR suma el artículo a "A retirar". 'ver': donde los operarios no retiran, abre la ficha del artículo. */
+  modo?: 'retirar' | 'ver';
+  onVer?: (articulo: ArticuloEscaneado) => void;
 }
 
-export default function QrScannerModal({ open, onClose, onListo }: Props) {
+export default function QrScannerModal({ open, onClose, onListo, buscarPorCodigo, modo = 'retirar', onVer }: Props) {
   const { cart, addItem, removeItem } = useRetiroCart();
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -102,10 +108,14 @@ export default function QrScannerModal({ open, onClose, onListo }: Props) {
     ultimoTimestampRef.current = ahora;
 
     // El repuesto se busca por su código en la base (una consulta chica), no en una lista descargada.
-    void buscarRepuestoPorCodigo(codigo).then(item => {
+    void buscarPorCodigo(codigo).then(item => {
       if (!item) {
         setStatus(<><Icono n="fallo" /> Código "{codigo}" no encontrado en el catálogo</>);
         setStatusColor('danger');
+      } else if (modo === 'ver') {
+        scanningRef.current = false;
+        if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+        onVer?.(item);
       } else {
         addItem(item);
         setStatus(<><Icono n="ok" /> {item.codigo} agregado — seguí escaneando</>);
@@ -142,11 +152,12 @@ export default function QrScannerModal({ open, onClose, onListo }: Props) {
       open={open}
       onClose={handleClose}
       title={<><span className="accent"><Icono n="camara" /></span> Escanear QR</>}
-      footer={<Button variant="success" onClick={handleListo}><Icono n="ok" /> Listo, ver lista completa</Button>}
+      footer={modo === 'retirar' ? <Button variant="success" onClick={handleListo}><Icono n="ok" /> Listo, ver lista completa</Button> : undefined}
     >
       <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', borderRadius: 'var(--radius-sm)', background: '#000', display: 'block' }} />
       <div style={{ textAlign: 'center', fontSize: 13, color: colorVar, marginTop: 10, minHeight: 18 }}>{status}</div>
 
+      {modo === 'retirar' && <>
       <div style={{ fontWeight: 700, fontSize: 13, marginTop: 14, marginBottom: 6 }}>Vas escaneando:</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
         {!cart.length && <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Todavía no escaneaste nada.</p>}
@@ -158,6 +169,7 @@ export default function QrScannerModal({ open, onClose, onListo }: Props) {
           </div>
         ))}
       </div>
+      </>}
     </Modal>
   );
 }

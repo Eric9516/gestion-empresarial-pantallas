@@ -2,22 +2,27 @@ import { useState } from 'react';
 import ImageLightbox from '../../components/ImageLightbox';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { useAprobarFotoPendiente, useFotosPendientesQuery, useRechazarFotoPendiente, type FilaFotoPendiente } from './useFotosPendientes';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
+import type { FilaFotoPendiente } from './tipos';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
 export default function FotosPendientesPane() {
-  const { data: filas, isLoading, isError } = useFotosPendientesQuery();
-  const aprobar = useAprobarFotoPendiente();
-  const rechazar = useRechazarFotoPendiente();
+  const { fotosPendientes } = useServicioDeConfiguracion();
+  const pedido = usePedido('fotos-pendientes', fotosPendientes.leer, true);
+  const filas = pedido.data;
+  const isLoading = filas === undefined && !pedido.error;
+  const isError = !!pedido.error;
   const toast = useToast();
   const confirmar = useConfirm();
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   async function handleAprobar(f: FilaFotoPendiente) {
     try {
-      await aprobar.mutateAsync({ item_id: f.item_id, slot: f.slot });
+      await fotosPendientes.aprobar(f.item_id, f.slot);
+      pedido.recargar();
       toast('Foto aprobada', 'success');
     } catch (e) {
       toast('Error al aprobar: ' + mensajeDeError(e), 'error');
@@ -27,7 +32,8 @@ export default function FotosPendientesPane() {
   async function handleRechazar(f: FilaFotoPendiente) {
     if (!(await confirmar('¿Eliminar esta foto?', { textoConfirmar: 'Eliminar', peligroso: true }))) return;
     try {
-      await rechazar.mutateAsync({ item_id: f.item_id, slot: f.slot, fotoUrl: f.foto_url });
+      await fotosPendientes.rechazar(f);
+      pedido.recargar();
       toast('Foto eliminada', 'success');
     } catch (e) {
       toast('Error al eliminar: ' + mensajeDeError(e), 'error');

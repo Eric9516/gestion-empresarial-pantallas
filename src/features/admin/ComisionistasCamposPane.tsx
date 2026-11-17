@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAlCambiar } from '../../lib/useAlCambiar';
 import { useToast } from '../../components/ToastProvider';
-import { useCamposCustomQuery, type CampoCustom } from '../config/useCamposCustom';
-import { useSaveCamposCustom } from '../config/useConfiguracion';
+import type { CampoCustom } from '../config/camposCustom';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -17,13 +17,14 @@ const TIPOS: { value: CampoCustom['tipo']; label: string }[] = [
 ];
 
 export default function ComisionistasCamposPane() {
-  const { data: camposCustom } = useCamposCustomQuery();
-  const saveCamposCustom = useSaveCamposCustom();
+  const { config, comisionistas } = useServicioDeConfiguracion();
+  // (se compara la configuración, no la lista: sin campos guardados, la lista vacía sería otra en cada dibujo)
+  const guardados = config?.comisionistas_campos_custom as CampoCustom[] | null | undefined;
   const toast = useToast();
   const [campos, setCampos] = useState<CampoCustom[]>([]);
   const [saving, setSaving] = useState(false);
 
-  useAlCambiar([camposCustom], () => { if (camposCustom) setCampos(camposCustom); });
+  useAlCambiar([config], () => { if (config) setCampos(guardados ?? []); });
 
   function addRow() {
     setCampos(prev => [...prev, { id: `custom_${Date.now()}`, label: '', tipo: 'text' }]);
@@ -41,7 +42,7 @@ export default function ComisionistasCamposPane() {
     setSaving(true);
     try {
       const validos = campos.filter(c => c.label.trim());
-      await saveCamposCustom.mutateAsync(validos);
+      await comisionistas.guardarCampos(validos);
       setCampos(validos);
       toast('Campos guardados', 'success');
     } catch {

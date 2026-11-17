@@ -30,7 +30,7 @@
   inset: 0;
   background: rgba(15,30,60,0.55);
   z-index: 200;
-  backdrop-filter: blur(2px);
+  /* sin desenfoque (backdrop-filter): en una PC sin aceleración gráfica se recalcula en cada cambio de pantalla y todo se traba */
 }
 .mobile-menu-overlay.open { display: block; }
 
@@ -81,6 +81,9 @@
 
 .mobile-menu-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
 
+/* el título de cada grupo del menú (Áreas, Mantenimiento, Sectores...), como en el menú de la computadora */
+.mobile-nav-grupo { padding: 14px 20px 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.mobile-nav-separador { height: 1px; margin: 8px 20px; background: var(--border); }
 .mobile-nav-item {
   display: flex; align-items: center; gap: 14px;
   width: 100%; padding: 15px 20px;
@@ -89,6 +92,22 @@
   color: var(--text-mid); cursor: pointer; text-align: left;
   transition: all 0.15s;
 }
+/* Los sectores de Mantenimiento (pedido del dueño, 13/11/2026): cada uno es el título de su lista, con una barrita de su color (--marca),
+   y debajo, siempre a la vista, sus sub-sectores con un puntito, más chicos y corridos. */
+.mobile-nav-lista + .mobile-nav-lista { margin-top: 4px; }
+.mobile-nav-titulo { padding-top: 12px; padding-bottom: 12px; color: var(--text); font-weight: 800; }
+.mobile-nav-marca { width: 4px; height: 20px; margin: 0 8px; border-radius: 2px; background: var(--marca); flex-shrink: 0; }
+/* con sub-sectores: el título los despliega (flechita) y "ver todos" abre todos sus equipos */
+.mobile-nav-fila { display: flex; align-items: center; }
+.mobile-nav-fila .mobile-nav-titulo { flex: 1; min-width: 0; padding-right: 8px; }
+.mobile-nav-fila.active { background: color-mix(in srgb, var(--blue) 7%, transparent); }
+.mobile-nav-fila.active .mobile-nav-titulo { color: var(--blue); }
+.mobile-nav-flecha { display: inline-flex; margin-left: auto; color: var(--text-muted); transition: transform 0.15s; }
+.mobile-nav-flecha.desplegada { transform: rotate(90deg); }
+.mobile-nav-nota { flex: none; padding: 12px 20px 12px 8px; font-size: 13px; font-weight: 600; color: var(--blue); text-decoration: none; }
+.mobile-nav-item.sub { gap: 10px; padding-top: 10px; padding-bottom: 10px; padding-left: 44px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
+.mobile-nav-punto { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.55; flex-shrink: 0; }
+.mobile-nav-item.sub.active .mobile-nav-punto { opacity: 1; }
 .mobile-nav-item:hover { background: var(--surface2); color: var(--blue); }
 .mobile-nav-item.active {
   background: color-mix(in srgb, var(--blue) 7%, transparent);
@@ -97,10 +116,6 @@
   font-weight: 700;
 }
 .mobile-nav-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
-/* Sub-menú (por ejemplo, los sub-sectores): con sangría, y una flechita que gira en el ítem que lo despliega. */
-.mobile-nav-item.sub { padding-left: 54px; font-size: 14px; font-weight: 600; }
-.mobile-nav-flecha { display: inline-flex; margin-left: auto; color: var(--text-muted); transition: transform 0.15s; }
-.mobile-nav-flecha.desplegada { transform: rotate(90deg); }
 /* Número rojo al costado de lo que tiene algo nuevo o pendiente. */
 .aviso-numero {
   margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px;

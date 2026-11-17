@@ -2,6 +2,8 @@
    Se enciende al final de la migración. */
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
+/* Dónde están las clases (relativo a este archivo): toda la carpeta src. Vite ya la mira sola; la app de Next (web/) la necesita dicha. */
+@source "../";
 @import "tw-animate-css";
 
 /* Nombres de color que usan los componentes de shadcn. Hoy apuntan a los colores

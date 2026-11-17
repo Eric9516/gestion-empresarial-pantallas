@@ -1,5 +1,5 @@
 import Modal from '../../components/Modal';
-import type { Proveedor } from './useProveedores';
+import type { Proveedor } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 import type { ReactNode } from 'react';

@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import Modal from './Modal';
 import { useToast } from './ToastProvider';
-import { useEnviarSugerencia } from '../features/admin/useSugerencias';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
-export default function SugerenciaModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** Mandar una sugerencia (`enviar`: cada app a su manera). La comparten la app de Vite y la de Next. */
+export default function SugerenciaModal({ open, onClose, enviar }: { open: boolean; onClose: () => void; enviar: (mensaje: string) => Promise<void> }) {
   const [mensaje, setMensaje] = useState('');
-  const enviar = useEnviarSugerencia();
+  const [enviando, setEnviando] = useState(false);
   const toast = useToast();
 
   function handleClose() {
@@ -19,12 +19,15 @@ export default function SugerenciaModal({ open, onClose }: { open: boolean; onCl
 
   async function handleEnviar() {
     if (!mensaje.trim()) { toast('Escribí algo antes de enviar', 'error'); return; }
+    setEnviando(true);
     try {
-      await enviar.mutateAsync(mensaje.trim());
+      await enviar(mensaje.trim());
       toast('¡Gracias! Tu sugerencia fue enviada', 'success');
       handleClose();
     } catch (e) {
       toast('Error al enviar: ' + mensajeDeError(e), 'error');
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -36,8 +39,8 @@ export default function SugerenciaModal({ open, onClose }: { open: boolean; onCl
       footer={
         <>
           <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
-          <Button variant="success" disabled={enviar.isPending} onClick={() => void handleEnviar()}>
-            {enviar.isPending ? 'Enviando...' : 'Enviar'}
+          <Button variant="success" disabled={enviando} onClick={() => void handleEnviar()}>
+            {enviando ? 'Enviando...' : 'Enviar'}
           </Button>
         </>
       }

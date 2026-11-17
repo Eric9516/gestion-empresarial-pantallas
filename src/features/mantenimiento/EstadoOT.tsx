@@ -1,6 +1,5 @@
 import { formatearFechaSola } from '../../lib/fechaHoy';
-import type { EstadoAviso } from './preventivo';
-import { useFaltantes } from './useStockRepuestos';
+import { type EstadoAviso, faltantes } from './preventivo';
 import type { OrdenTrabajo } from './tipos';
 import { Icono } from '@/components/Icono';
 
@@ -13,8 +12,7 @@ const TEXTO: Record<EstadoAviso, string> = {
 
 /** Chips con el estado de una OT (vencida, por vencer, programada, terminada), si está en curso, si es urgente y si falta algún repuesto. */
 export default function EstadoOT({ ot, estado, conFecha }: { ot: OrdenTrabajo; estado: EstadoAviso; conFecha?: boolean }) {
-  const faltantes = useFaltantes();
-  const falta = ot.estado !== 'terminada' && faltantes(ot.repuestos ?? []).length > 0;
+  const falta = ot.estado !== 'terminada' && faltantes(ot.repuestos).length > 0;
   return (
     <>
       <span className={`mt-tag ${estado}`}>

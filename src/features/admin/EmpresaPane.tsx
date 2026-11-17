@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useAlCambiar } from '../../lib/useAlCambiar';
 import { useToast } from '../../components/ToastProvider';
-import { useConfiguracionQuery, useSaveConfiguracion } from '../config/useConfiguracion';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
 import { NOMBRE_EMPRESA_POR_DEFECTO } from '../../lib/empresa';
 import { COLOR_PRIMARIO_ORIGINAL, esColorValido, textoLegibleConBlanco } from '../../lib/marca';
 import ColorMarca from '../../components/ColorMarca';
@@ -13,8 +13,7 @@ import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
 export default function EmpresaPane() {
-  const { data: config } = useConfiguracionQuery();
-  const saveConfig = useSaveConfiguracion();
+  const { config, empresa } = useServicioDeConfiguracion();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,7 +62,7 @@ export default function EmpresaPane() {
     }
     setSaving(true);
     try {
-      await saveConfig.mutateAsync({
+      await empresa.guardar({
         empresa_nombre: nombre.trim() || NOMBRE_EMPRESA_POR_DEFECTO,
         empresa_direccion: direccion.trim(),
         empresa_telefono: telefono.trim(),

@@ -3,7 +3,10 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } f
 // Comportamiento de teclado y de lectores de pantalla para un menú desplegable que
 // ya existe visualmente (clases .user-dropdown*): se abre con la flecha ↓, se recorre
 // con las flechas, Inicio y Fin, y Esc lo cierra devolviendo el foco al botón. Los
-// ítems del menú tienen que llevar role="menuitem".
+// ítems del menú tienen que llevar role="menuitem" (o "menuitemradio" si son opciones para elegir).
+// Los ítems que se recorren con el teclado: acciones y opciones para elegir (con su marca). Los deshabilitados se saltean.
+const ITEMS = '[role="menuitem"]:not(:disabled), [role="menuitemradio"]:not(:disabled)';
+
 export function useMenu() {
   const [abierto, setAbierto] = useState(false);
   const contenedorRef = useRef<HTMLDivElement>(null);
@@ -26,11 +29,11 @@ export function useMenu() {
   }, [abierto]);
 
   useEffect(() => {
-    if (abierto) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    if (abierto) menuRef.current?.querySelector<HTMLElement>(ITEMS)?.focus();
   }, [abierto]);
 
   function alTeclaEnElMenu(e: KeyboardEvent<HTMLElement>) {
-    const items = [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const items = [...(menuRef.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])];
     const actual = items.indexOf(document.activeElement as HTMLElement);
     const irA = (n: number) => { e.preventDefault(); items[(n + items.length) % items.length]?.focus(); };
     if (e.key === 'ArrowDown') irA(actual + 1);
@@ -49,6 +52,7 @@ export function useMenu() {
     onClick: () => setAbierto(prev => !prev),
     onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAbierto(true); }
+      else if (e.key === 'Escape' && abierto) { e.preventDefault(); cerrar(); }
     },
   };
 

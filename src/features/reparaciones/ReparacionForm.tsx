@@ -1,31 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
 import { fechaHoyISO } from '../../lib/fechaHoy';
-import { useRepuestosParaElegir } from '../items/useItems';
-import { useProveedoresQuery } from '../proveedores/useProveedores';
+import { useRepuestosQueCoinciden } from '../items/useRepuestosQueCoinciden';
 import { enviosDelProveedor, enviosLibres, etiquetaDeEnvio } from '../rotulos/etiquetaEnvio';
-import { useDetallesDeEnviosQuery, useRotulosQuery } from '../rotulos/useRotulos';
-import { useCrearReparacion, useEnviosAsignadosQuery } from './useReparaciones';
+import { useServicioDeReparaciones } from './servicioDeReparaciones';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
 
+// Un repuesto del depósito o, sin item_id, algo que no está en el depósito (una máquina de la planta): se describe con un texto y no mueve stock.
 interface LineaNueva {
-  item_id: string;
-  codigo: string;
+  clave: string;
+  item_id: string | null;
+  codigo: string | null;
   descripcion: string;
   cantidad: number;
   descuentaStock: boolean;
 }
 
 export default function ReparacionForm({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { data: proveedores } = useProveedoresQuery();
-  const { data: envios } = useRotulosQuery();
-  const crear = useCrearReparacion();
+  const servicio = useServicioDeReparaciones();
+  const { proveedores, envios } = servicio;
+  const [guardando, setGuardando] = useState(false);
   const toast = useToast();
 
   const [proveedorId, setProveedorId] = useState('');
@@ -34,14 +33,15 @@ export default function ReparacionForm({ open, onClose }: { open: boolean; onClo
   const [envioId, setEnvioId] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [lineas, setLineas] = useState<LineaNueva[]>([]);
+  const libres = useRef(0);
 
   // Solo los envíos del proveedor elegido que no tengan ya otra reparación, con lo que lleva cada uno para reconocerlos.
-  const { data: asignados } = useEnviosAsignadosQuery();
+  const asignados = servicio.enviosAsignados;
   const enviosDelProv = useMemo(() => enviosDelProveedor(envios, proveedorId), [envios, proveedorId]);
   const enviosLibresDelProv = useMemo(() => enviosLibres(enviosDelProv, asignados), [enviosDelProv, asignados]);
-  const { data: detallesDeEnvios } = useDetallesDeEnviosQuery(enviosLibresDelProv.map(e => e.id));
+  const detallesDeEnvios = servicio.detallesDeEnvios;
 
-  const resultados = useRepuestosParaElegir(busqueda);
+  const resultados = useRepuestosQueCoinciden(busqueda, servicio.buscarRepuestos);
 
   function handleClose() {
     setProveedorId('');
@@ -55,40 +55,51 @@ export default function ReparacionForm({ open, onClose }: { open: boolean; onClo
 
   function agregarLinea(it: { id: string; codigo: string; descripcion: string }) {
     if (lineas.some(l => l.item_id === it.id)) { toast('Ese artículo ya está agregado', 'error'); return; }
-    setLineas(prev => [...prev, { item_id: it.id, codigo: it.codigo, descripcion: it.descripcion, cantidad: 1, descuentaStock: true }]);
+    setLineas(prev => [...prev, { clave: it.id, item_id: it.id, codigo: it.codigo, descripcion: it.descripcion, cantidad: 1, descuentaStock: true }]);
     setBusqueda('');
   }
 
-  function actualizarCantidad(itemId: string, value: string) {
+  function agregarLineaLibre() {
+    libres.current += 1;
+    setLineas(prev => [...prev, { clave: `libre-${libres.current}`, item_id: null, codigo: null, descripcion: '', cantidad: 1, descuentaStock: false }]);
+  }
+
+  function cambiarLinea(clave: string, cambio: Partial<LineaNueva>) {
+    setLineas(prev => prev.map(l => (l.clave === clave ? { ...l, ...cambio } : l)));
+  }
+
+  function actualizarCantidad(clave: string, value: string) {
     const n = parseInt(value, 10);
-    setLineas(prev => prev.map(l => (l.item_id === itemId ? { ...l, cantidad: n > 0 ? n : 1 } : l)));
+    cambiarLinea(clave, { cantidad: n > 0 ? n : 1 });
   }
 
-  function actualizarDescuentaStock(itemId: string, value: boolean) {
-    setLineas(prev => prev.map(l => (l.item_id === itemId ? { ...l, descuentaStock: value } : l)));
-  }
-
-  function quitarLinea(itemId: string) {
-    setLineas(prev => prev.filter(l => l.item_id !== itemId));
+  function quitarLinea(clave: string) {
+    setLineas(prev => prev.filter(l => l.clave !== clave));
   }
 
   async function handleGuardar() {
     if (!proveedorId) { toast('Elegí un proveedor', 'error'); return; }
     if (!motivo.trim()) { toast('Ingresá un motivo', 'error'); return; }
     if (!lineas.length) { toast('Agregá al menos un artículo', 'error'); return; }
+    if (lineas.some(l => !l.item_id && !l.descripcion.trim())) { toast('Escribí qué se envía en las líneas que no son del depósito', 'error'); return; }
+    setGuardando(true);
     try {
-      await crear.mutateAsync({
+      await servicio.crear({
         proveedor_id: proveedorId,
         motivo: motivo.trim(),
         fecha_salida: fechaSalida,
         envio_id: envioId || null,
-        items: lineas.map(l => ({ item_id: l.item_id, cantidad: l.cantidad, descuenta_stock: l.descuentaStock })),
+        items: lineas.map(l => l.item_id
+          ? { item_id: l.item_id, cantidad: l.cantidad, descuenta_stock: l.descuentaStock }
+          : { item_id: null, descripcion: l.descripcion.trim(), cantidad: l.cantidad, descuenta_stock: false }),
       });
       toast('Reparación cargada', 'success');
       handleClose();
     } catch (err) {
-      await registrarErrorAccion('Error al crear una reparación', err);
+      await servicio.registrarError('Error al crear una reparación', err);
       toast('Error al guardar la reparación: ' + mensajeDeError(err), 'error');
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -101,8 +112,8 @@ export default function ReparacionForm({ open, onClose }: { open: boolean; onClo
       footer={
         <>
           <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
-          <Button variant="success" disabled={crear.isPending} onClick={() => void handleGuardar()}>
-            {crear.isPending ? 'Guardando...' : 'Guardar reparación'}
+          <Button variant="success" disabled={guardando} onClick={() => void handleGuardar()}>
+            {guardando ? 'Guardando...' : 'Guardar reparación'}
           </Button>
         </>
       }
@@ -146,19 +157,33 @@ export default function ReparacionForm({ open, onClose }: { open: boolean; onClo
           )) : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin resultados</p>}
         </div>
       )}
+      <div style={{ marginBottom: 12 }}>
+        <Button variant="ghost" size="sm" onClick={agregarLineaLibre} title="Una máquina o algo de la planta que no tenés cargado en el depósito: se describe con un texto y no mueve stock">
+          <Icono n="mas" /> Agregar algo que no está en el depósito
+        </Button>
+      </div>
 
       {!lineas.length && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Todavía no agregaste ningún artículo.</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {lineas.map(l => (
-          <div key={l.item_id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '8px 10px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)' }}>
-            <div style={{ flex: 1, minWidth: 160, fontSize: 13 }}><strong>{l.codigo}</strong> — {l.descripcion}</div>
-            <label htmlFor={`cantidad-${l.item_id}`} style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cantidad:</label>
-            <Input id={`cantidad-${l.item_id}`} type="number" min={1} style={{ width: 64 }} value={l.cantidad} onChange={e => actualizarCantidad(l.item_id, e.target.value)} />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-mid)', cursor: 'pointer' }} title="Destildalo si ya se descontó antes, por ejemplo con un retiro">
-              <input type="checkbox" checked={l.descuentaStock} onChange={e => actualizarDescuentaStock(l.item_id, e.target.checked)} />
-              Descontar del stock
-            </label>
-            <Button variant="dangerGhost" size="icon" title="Quitar" onClick={() => quitarLinea(l.item_id)}><Icono n="cerrar" /></Button>
+          <div key={l.clave} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '8px 10px', background: 'var(--surface2)', borderRadius: 'var(--radius-sm)' }}>
+            {l.item_id ? (
+              <div style={{ flex: 1, minWidth: 160, fontSize: 13 }}><strong>{l.codigo}</strong> — {l.descripcion}</div>
+            ) : (
+              <Input aria-label="Qué se envía" autoFocus maxLength={300} style={{ flex: 1, minWidth: 200 }} value={l.descripcion}
+                placeholder="Ej: impresora de etiquetas Honeywell PD45, cámara de expedición" onChange={e => cambiarLinea(l.clave, { descripcion: e.target.value })} />
+            )}
+            <label htmlFor={`cantidad-${l.clave}`} style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cantidad:</label>
+            <Input id={`cantidad-${l.clave}`} type="number" min={1} style={{ width: 64 }} value={l.cantidad} onChange={e => actualizarCantidad(l.clave, e.target.value)} />
+            {l.item_id ? (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-mid)', cursor: 'pointer' }} title="Destildalo si ya se descontó antes, por ejemplo con un retiro">
+                <input type="checkbox" checked={l.descuentaStock} onChange={e => cambiarLinea(l.clave, { descuentaStock: e.target.checked })} />
+                Descontar del stock
+              </label>
+            ) : (
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>No está en el depósito: no mueve stock</span>
+            )}
+            <Button variant="dangerGhost" size="icon" title="Quitar" onClick={() => quitarLinea(l.clave)}><Icono n="cerrar" /></Button>
           </div>
         ))}
       </div>

@@ -1,10 +1,9 @@
 import { diasEntre, sumarDias } from './fechas';
-import type { Equipo, FechaISO, Intervencion } from './tipos';
+import type { Equipo, FechaISO, Parada } from './tipos';
 
-// Disponibilidad de los equipos: de las horas del período (24 h por día), cuántas estuvo parado cada equipo.
-// Por ahora solo cuentan las paradas por mantenimiento, que salen del historial: las horas de parada de los
-// correctivos y las de los preventivos, por separado. Más adelante se suman las paradas por producción y por
-// fin de producción (decisión del encargado, 06/11/2026).
+// Disponibilidad de los equipos (del socio, 06/11/2026): de las horas del período (24 h por día), cuántas estuvo parado cada equipo. Por ahora
+// solo cuentan las paradas por mantenimiento, que salen del historial: las de los correctivos y las de los preventivos, por separado. Más
+// adelante se suman las paradas por producción y por fin de producción (decisión del encargado).
 
 export type PeriodoId = 'mes' | 'mesAnterior' | 'tresMeses' | 'anio';
 
@@ -26,10 +25,7 @@ export function periodo(id: PeriodoId, hoy: FechaISO): Periodo {
   const primero = (anio: number, mes: number) => `${anio}-${String(mes).padStart(2, '0')}-01`;
   switch (id) {
     case 'mes': return { desde: primero(a, m), hasta: hoy };
-    case 'mesAnterior': {
-      const desde = m === 1 ? primero(a - 1, 12) : primero(a, m - 1);
-      return { desde, hasta: sumarDias(primero(a, m), -1) };
-    }
+    case 'mesAnterior': return { desde: m === 1 ? primero(a - 1, 12) : primero(a, m - 1), hasta: sumarDias(primero(a, m), -1) };
     case 'tresMeses': return { desde: sumarDias(hoy, -89), hasta: hoy };
     case 'anio': return { desde: `${a}-01-01`, hasta: hoy };
   }
@@ -42,14 +38,6 @@ export function horasDelPeriodo(p: Periodo): number {
 
 export function dentro(fecha: FechaISO, p: Periodo): boolean {
   return fecha >= p.desde && fecha <= p.hasta;
-}
-
-/** Horas que el equipo estuvo parado por un registro del historial, separadas por tipo. */
-export function horasParadaDe(i: Intervencion): { correctivo: number; preventivo: number } {
-  const valor = (n: number | null | undefined) => (n != null && Number.isFinite(n) && n > 0 ? n : 0);
-  return i.tipo === 'correctivo'
-    ? { correctivo: valor(i.correctivo?.horasParada), preventivo: 0 }
-    : { correctivo: 0, preventivo: valor(i.horasParada) };
 }
 
 export interface FilaDisponibilidad {
@@ -78,7 +66,7 @@ export interface ResumenDisponibilidad {
 }
 
 function fila(horas: number, corr: number, prev: number): FilaDisponibilidad {
-  // Las paradas no pueden pasar las horas del período (por si se anotó de más).
+  // las paradas no pueden pasar las horas del período (por si se anotó de más)
   const paradaCorrectivo = Math.min(corr, horas);
   const paradaPreventivo = Math.min(prev, horas - paradaCorrectivo);
   const disponibilidad = horas > 0 ? ((horas - paradaCorrectivo - paradaPreventivo) / horas) * 100 : 100;
@@ -86,34 +74,29 @@ function fila(horas: number, corr: number, prev: number): FilaDisponibilidad {
 }
 
 /**
- * Se mide cada equipo principal: si para un sub-equipo (por ejemplo, la bomba de un pasteurizador), se cuenta
- * como parada del equipo principal. Los sectores siguen el orden recibido (el de importancia de la empresa).
+ * Se mide cada equipo principal: si para un sub-equipo (por ejemplo, la bomba de un pasteurizador), cuenta como parada de su principal.
+ * Los sectores siguen el orden recibido (el de importancia de la empresa).
  */
-export function calcularDisponibilidad(equipos: Equipo[], intervenciones: Intervencion[], p: Periodo, ordenSectores: string[] = []): ResumenDisponibilidad {
+export function calcularDisponibilidad(equipos: Equipo[], paradas: Parada[], p: Periodo, ordenSectores: string[] = []): ResumenDisponibilidad {
   const horas = horasDelPeriodo(p);
   const principales = equipos.filter(e => !e.padreId);
-  const principalDe = new Map<string, string>();
-  for (const e of equipos) principalDe.set(e.id, e.padreId ?? e.id);
+  const principalDe = new Map(equipos.map(e => [e.id, e.padreId ?? e.id]));
 
   const parada = new Map<string, { corr: number; prev: number }>();
-  for (const i of intervenciones) {
-    if (!dentro(i.fecha, p)) continue;
-    const id = principalDe.get(i.equipoId);
+  for (const x of paradas) {
+    if (!dentro(x.fecha, p) || !(x.horas > 0)) continue;
+    const id = principalDe.get(x.equipoId);
     if (!id) continue;
-    const h = horasParadaDe(i);
     const actual = parada.get(id) ?? { corr: 0, prev: 0 };
-    parada.set(id, { corr: actual.corr + h.correctivo, prev: actual.prev + h.preventivo });
+    parada.set(id, x.tipo === 'correctivo' ? { ...actual, corr: actual.corr + x.horas } : { ...actual, prev: actual.prev + x.horas });
   }
 
   const porEquipo: DisponibilidadEquipo[] = principales.map(e => {
     const x = parada.get(e.id) ?? { corr: 0, prev: 0 };
     return { equipo: e, ...fila(horas, x.corr, x.prev) };
   });
-
-  const suma = (lista: DisponibilidadEquipo[]) => {
-    const f = fila(horas * lista.length, lista.reduce((t, x) => t + x.paradaCorrectivo, 0), lista.reduce((t, x) => t + x.paradaPreventivo, 0));
-    return f;
-  };
+  const suma = (lista: DisponibilidadEquipo[]) =>
+    fila(horas * lista.length, lista.reduce((t, x) => t + x.paradaCorrectivo, 0), lista.reduce((t, x) => t + x.paradaPreventivo, 0));
 
   const sectores = new Map<string, DisponibilidadEquipo[]>();
   for (const x of porEquipo) {

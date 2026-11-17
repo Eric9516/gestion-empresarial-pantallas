@@ -2,8 +2,7 @@ import { useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
-import { useGuardarComentarioRotulo } from './useRotulos';
+import { useServicioDeEnvios } from './servicioDeEnvios';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Icono } from '@/components/Icono';
@@ -20,7 +19,8 @@ interface Props {
 export default function ComentarioRotuloModal({ rotuloId, comentarioActual, puedeEditar, onClose }: Props) {
   const toast = useToast();
   const confirmar = useConfirm();
-  const guardar = useGuardarComentarioRotulo();
+  const { guardarComentario, registrarError } = useServicioDeEnvios();
+  const [guardando, setGuardando] = useState(false);
   const [texto, setTexto] = useState('');
   // Cuando cambia el envío o su comentario, el cuadro se vuelve a llenar con lo guardado (se ajusta al dibujar, sin efectos).
   const origen = rotuloId ? `${rotuloId}|${comentarioActual ?? ''}` : null;
@@ -32,27 +32,27 @@ export default function ComentarioRotuloModal({ rotuloId, comentarioActual, pued
 
   if (!rotuloId) return null;
 
-  async function handleGuardar() {
+  async function guardar(comentario: string, hecho: string, error: string) {
+    setGuardando(true);
     try {
-      await guardar.mutateAsync({ id: rotuloId!, comentario: texto });
-      toast('Comentario guardado', 'success');
+      await guardarComentario(rotuloId!, comentario);
+      toast(hecho, 'success');
       onClose();
     } catch (err) {
-      await registrarErrorAccion('Error al guardar el comentario de un envío', err);
-      toast('No se pudo guardar el comentario', 'error');
+      await registrarError(`Error al ${error} el comentario de un envío`, err);
+      toast(`No se pudo ${error} el comentario`, 'error');
+    } finally {
+      setGuardando(false);
     }
+  }
+
+  async function handleGuardar() {
+    await guardar(texto, 'Comentario guardado', 'guardar');
   }
 
   async function handleBorrar() {
     if (!(await confirmar('¿Borrar este comentario?', { textoConfirmar: 'Borrar', peligroso: true }))) return;
-    try {
-      await guardar.mutateAsync({ id: rotuloId!, comentario: '' });
-      toast('Comentario borrado', 'success');
-      onClose();
-    } catch (err) {
-      await registrarErrorAccion('Error al borrar el comentario de un envío', err);
-      toast('No se pudo borrar el comentario', 'error');
-    }
+    await guardar('', 'Comentario borrado', 'borrar');
   }
 
   if (!puedeEditar) {
@@ -72,9 +72,9 @@ export default function ComentarioRotuloModal({ rotuloId, comentarioActual, pued
       title={<><Icono n="mensaje" /> Comentario</>}
       footer={
         <>
-          {comentarioActual && <Button variant="dangerGhost" disabled={guardar.isPending} onClick={() => void handleBorrar()}>Borrar</Button>}
+          {comentarioActual && <Button variant="dangerGhost" disabled={guardando} onClick={() => void handleBorrar()}>Borrar</Button>}
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" disabled={guardar.isPending} onClick={() => void handleGuardar()}>Guardar</Button>
+          <Button variant="primary" disabled={guardando} onClick={() => void handleGuardar()}>Guardar</Button>
         </>
       }
     >

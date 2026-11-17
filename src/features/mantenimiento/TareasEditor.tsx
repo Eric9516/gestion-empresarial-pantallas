@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { filaNueva, type FilaTarea } from './tareas';
+import { filaNueva, type FilaTarea } from './filasDeTareas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Icono } from '@/components/Icono';
@@ -9,17 +9,15 @@ interface Props {
   onChange: (filas: FilaTarea[]) => void;
 }
 
-// Lista de tareas para editar (planillas y rutinas): una tarea por fila. Cada tarea se tilda o, si se
-// marca "Anotar valor", pide un número con su unidad y su rango normal (avisa si queda fuera).
-// Enter en una tarea agrega otra abajo, para cargar rápido.
+// Lista de tareas para editar (planillas y rutinas; del diseño del socio): una tarea por fila. Cada tarea se tilda o, si se marca
+// "Anotar un valor", pide un número con su unidad y su rango normal (avisa si queda fuera). Enter en una tarea agrega otra abajo.
 export default function TareasEditor({ filas, onChange }: Props) {
   const uid = useId();
   const [enfocar, setEnfocar] = useState<string | null>(null);
   const refs = useRef(new Map<string, HTMLInputElement>());
 
   useEffect(() => {
-    if (!enfocar) return;
-    refs.current.get(enfocar)?.focus();
+    if (enfocar) refs.current.get(enfocar)?.focus();
   }, [enfocar, filas]);
 
   function cambiar(id: string, c: Partial<FilaTarea>) {
@@ -43,7 +41,7 @@ export default function TareasEditor({ filas, onChange }: Props) {
       {filas.map((f, i) => (
         <div key={f.id} className="mt-tarea-ed">
           <div className="mt-tarea-ed-fila">
-            <span className="mt-orden-num">{i + 1}</span>
+            <span className="mt-orden-num" aria-hidden="true">{i + 1}</span>
             <Input
               ref={el => { if (el) refs.current.set(f.id, el); else refs.current.delete(f.id); }}
               aria-label={`Tarea ${i + 1}`} value={f.texto} placeholder={f.conValor ? 'Ej.: Medir vibración del motor' : 'Ej.: Engrasar rodamientos'}
@@ -64,7 +62,7 @@ export default function TareasEditor({ filas, onChange }: Props) {
             <div className="mt-rep-fila">
               <div className="mt-rep-campo" style={{ flex: 1 }}>
                 <label htmlFor={`${uid}-u${i}`}>Unidad</label>
-                <Input id={`${uid}-u${i}`} value={f.unidad} onChange={e => cambiar(f.id, { unidad: e.target.value })} placeholder="mm/s, °C, bar, A..." />
+                <Input id={`${uid}-u${i}`} value={f.unidad} onChange={e => cambiar(f.id, { unidad: e.target.value })} placeholder="mm/s, °C, bar, A..." maxLength={30} />
               </div>
               <div className="mt-rep-campo" style={{ flex: 1 }}>
                 <label htmlFor={`${uid}-mi${i}`}>Mínimo normal</label>

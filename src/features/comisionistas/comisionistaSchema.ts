@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 export const comisionistaSchema = z.object({
   nombre: z.string().min(1, 'El nombre es obligatorio'),

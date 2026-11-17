@@ -3,8 +3,8 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { useCamposCustomQuery } from '../config/useCamposCustom';
-import { useSaveComisionista, type Comisionista } from './useComisionistas';
+import type { CampoCustom } from '../config/camposCustom';
+import type { Comisionista, GuardarComisionista } from './tipos';
 import { comisionistaSchema, emptyComisionista, type ComisionistaFormValues } from './comisionistaSchema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,12 +17,14 @@ interface Props {
   open: boolean;
   onClose: () => void;
   comisionista: Comisionista | null;
+  /** Los campos que el dueño agregó (Configuración). */
+  camposCustom: CampoCustom[];
+  /** Guarda (cada app a su manera). Si alguien lo cambió en el medio, falla con ConflictoDeEdicion. */
+  guardar: GuardarComisionista;
 }
 
-export default function ComisionistaForm({ open, onClose, comisionista }: Props) {
+export default function ComisionistaForm({ open, onClose, comisionista, camposCustom, guardar }: Props) {
   const toast = useToast();
-  const saveComisionista = useSaveComisionista();
-  const { data: camposCustom } = useCamposCustomQuery();
 
   const { register, control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ComisionistaFormValues>({
     resolver: zodResolver(comisionistaSchema),
@@ -53,7 +55,7 @@ export default function ComisionistaForm({ open, onClose, comisionista }: Props)
 
   async function onSubmit(values: ComisionistaFormValues) {
     try {
-      await saveComisionista.mutateAsync({ id: comisionista?.id ?? null, data: values, version: comisionista ? comisionista.updated_at : undefined });
+      await guardar({ id: comisionista?.id ?? null, data: values, version: comisionista ? comisionista.updated_at : undefined });
       toast(comisionista ? 'Comisionista actualizado' : 'Comisionista agregado', 'success');
       onClose();
     } catch (e) {
@@ -104,7 +106,7 @@ export default function ComisionistaForm({ open, onClose, comisionista }: Props)
         </div>
         <div className="form-group full"><label htmlFor="comisionista-form-10">Notas</label><Textarea id="comisionista-form-10" rows={2} {...register('notas')} /></div>
 
-        {(camposCustom ?? []).map(campo => (
+        {camposCustom.map(campo => (
           <div className="form-group full" key={campo.id}>
             <label htmlFor={`campo-extra-${campo.id}`}>{campo.label}</label>
             {campo.tipo === 'textarea'

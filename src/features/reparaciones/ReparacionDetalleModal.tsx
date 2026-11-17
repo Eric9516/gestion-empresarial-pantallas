@@ -1,10 +1,8 @@
 import Modal from '../../components/Modal';
 import { formatearFechaSola } from '../../lib/fechaHoy';
 import EstadoChip from './EstadoChip';
-import {
-  cantidadDevuelta, estadoLinea, estadoReparacion,
-  type ReparacionConDetalle, type ReparacionEntrega, type ReparacionItemConDetalle,
-} from './useReparaciones';
+import { cantidadDevuelta, estadoLinea, estadoReparacion, queSeMando } from './estadoDeReparacion';
+import type { ReparacionConDetalle, ReparacionEntrega, ReparacionItemConDetalle } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Icono } from '@/components/Icono';
 
@@ -13,7 +11,8 @@ interface Props {
   onClose: () => void;
   onEntrega: (linea: ReparacionItemConDetalle) => void;
   onEditar: (reparacion: ReparacionConDetalle) => void;
-  onVerEnvio: (envioId: string) => void;
+  /** Sin esto, el número de envío se muestra sin enlace. */
+  onVerEnvio?: (envioId: string) => void;
 }
 
 function textoEntrega(e: ReparacionEntrega): string {
@@ -31,7 +30,7 @@ export default function ReparacionDetalleModal({ reparacion, onClose, onEntrega,
     { etiqueta: 'Salida', valor: formatearFechaSola(reparacion.fecha_salida) },
     {
       etiqueta: 'Envío',
-      valor: reparacion.envio_id && numeroEnvio
+      valor: reparacion.envio_id && numeroEnvio && onVerEnvio
         ? (
           <button
             type="button"
@@ -40,13 +39,13 @@ export default function ReparacionDetalleModal({ reparacion, onClose, onEntrega,
             style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: 'var(--blue)', textDecoration: 'underline', cursor: 'pointer' }}
           >{numeroEnvio}</button>
         )
-        : '—',
+        : (numeroEnvio ?? '—'),
     },
     {
       etiqueta: 'Orden de compra',
       valor: reparacion.orden_compra_numero
         ? `${reparacion.orden_compra_numero}${reparacion.orden_compra_fecha ? ` (${formatearFechaSola(reparacion.orden_compra_fecha)})` : ''}`
-        : '—',
+        : (numeroEnvio ?? '—'),
     },
   ] : [];
 
@@ -84,11 +83,13 @@ export default function ReparacionDetalleModal({ reparacion, onClose, onEntrega,
             {reparacion.reparacion_items.map(linea => {
               const estado = estadoLinea(linea);
               const entregas = [...linea.reparacion_entregas].sort((a, b) => a.fecha_entrega.localeCompare(b.fecha_entrega));
+              const { codigo, texto } = queSeMando(linea);
               return (
                 <div key={linea.id} style={{ border: '1.5px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ minWidth: 0, fontSize: 13 }}>
-                      <strong>{linea.items?.codigo}</strong> — {linea.items?.descripcion}
+                      {codigo ? <><strong>{codigo}</strong> — {texto}</> : texto}
+                      {!codigo && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>No está en el depósito (no mueve stock)</div>}
                       <div style={{ fontSize: 12, color: 'var(--text-mid)', marginTop: 2 }}>
                         Enviado: {Number(linea.cantidad)} · Devuelto: {cantidadDevuelta(linea)}
                       </div>

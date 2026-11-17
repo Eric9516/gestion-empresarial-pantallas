@@ -1,4 +1,4 @@
-import { puedeAjustarInventario, puedeGestionarDepositos, puedeResetearContrasenas, puedeVerErrores, puedeVerSugerencias, puedeVerTodosLosRetiros, type Profile } from '../../lib/types';
+import { puedeAjustarInventario, puedeGestionarDepositos, puedeResetearContrasenas, puedeVerAuditoria, puedeVerErrores, puedeVerInforme, puedeVerSugerencias, puedeVerTodosLosRetiros, type Profile } from '../../lib/types';
 
 // Lo que una persona puede hacer, en palabras. "Mi perfil" muestra solo el nombre y si lo tiene o no;
 // qué significa cada cosa se explica aparte, con el botón de ayuda (signo de pregunta).
@@ -20,7 +20,9 @@ export function permisosDe({ profile, deposito }: Contexto): Permiso[] {
     ...(deposito ? [
       { clave: 'retiros', nombre: 'Ver todos los retiros', explicacion: 'Ve los retiros que hizo cualquier persona, no solo los suyos.', tiene: puedeVerTodosLosRetiros(profile) },
       { clave: 'ajustes', nombre: 'Ajustar inventario', explicacion: 'Puede cargar stock y corregirlo (Movimientos). Cada cambio queda registrado con su nombre.', tiene: puedeAjustarInventario(profile) },
-      { clave: 'depositos', nombre: 'Gestionar depósitos', explicacion: 'Puede crear depósitos y cambiarles el nombre, el color, el ícono o la letra (Configuración, Depósitos).', tiene: puedeGestionarDepositos(profile) },
+      { clave: 'informe', nombre: 'Ver el informe de reposición', explicacion: 'Ve qué artículos llegaron al punto de pedido y hay que comprar (Depósito, Informe).', tiene: puedeVerInforme(profile) },
+      { clave: 'depositos', nombre: 'Administrador de Compras', explicacion: 'Crea y edita los depósitos, decide cómo trabaja cada uno (retiros, reparaciones) y ve el informe de reposición (Configuración, Depósitos).', tiene: puedeGestionarDepositos(profile) },
+      { clave: 'auditoria', nombre: 'Ver auditoría', explicacion: 'Ve el historial de actividad (Configuración, Historial): qué se cargó, retiró o cambió, quién y cuándo. Solo lo de sus depósitos y el Directorio.', tiene: puedeVerAuditoria(profile) },
     ] : []),
     { clave: 'errores', nombre: 'Ver errores', explicacion: 'Ve los errores que registró la aplicación (Configuración, Errores). Sirve para avisar de un problema.', tiene: puedeVerErrores(profile) },
     { clave: 'sugerencias', nombre: 'Ver sugerencias', explicacion: 'Lee las sugerencias que mandan las demás personas y recibe el aviso cuando llega una nueva.', tiene: puedeVerSugerencias(profile) },
@@ -33,6 +35,8 @@ export const ROLES_EXPLICADOS: { nombre: string; explicacion: string }[] = [
   { nombre: 'Dueño del sistema', explicacion: 'Control total: configura la empresa, los módulos y las personas, y ve todo. Puede haber más de uno.' },
   { nombre: 'Administrador', explicacion: 'Gestiona su área: configura lo suyo y ve los informes. No cambia la licencia ni los módulos de la empresa.' },
   { nombre: 'Usuario', explicacion: 'Trabaja en su área (buscar, cargar, retirar) sin tocar la configuración.' },
+  { nombre: 'Técnico (Mantenimiento)', explicacion: 'Ve los equipos, sus manuales y su historial, y registra los trabajos que hace.' },
+  { nombre: 'Solo consulta (Mantenimiento)', explicacion: 'Ve los equipos, sus manuales y su historial, sin cambiar nada.' },
   { nombre: 'Sin acceso', explicacion: 'No puede entrar a esa área.' },
 ];
 

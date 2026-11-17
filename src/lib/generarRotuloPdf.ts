@@ -1,4 +1,4 @@
-import { DEFAULT_CAMPOS, DEFAULT_DESIGN, type RotuloCampos, type RotuloDesign } from './rotuloDesign';
+import { DEFAULT_CAMPOS, DEFAULT_DESIGN, getCurrentCampos, getCurrentDesign, type RotuloCampos, type RotuloDesign } from './rotuloDesign';
 import { buildPDF } from './rotuloPdf';
 import { NOMBRE_EMPRESA_POR_DEFECTO } from './empresa';
 
@@ -12,6 +12,19 @@ export interface RotuloSnapshot {
   pie: string;
   empresa: string;
   logo: string;
+}
+
+/** El diseño de ahora, de la configuración de la empresa (lo que se copia en cada envío al crearlo). */
+export function disenoDelRotulo(config: {
+  rotulo_design: unknown; rotulo_campos: unknown; rotulo_pie: string | null; empresa_nombre: string | null; logo_base64: string | null;
+}): RotuloSnapshot {
+  return {
+    design: getCurrentDesign(config.rotulo_design),
+    campos: getCurrentCampos(config.rotulo_campos),
+    pie: config.rotulo_pie || '',
+    empresa: config.empresa_nombre || NOMBRE_EMPRESA_POR_DEFECTO,
+    logo: config.logo_base64 || '',
+  };
 }
 
 interface ProveedorParaPdf {

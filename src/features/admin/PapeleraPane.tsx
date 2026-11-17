@@ -1,7 +1,8 @@
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
-import { usePapeleraQuery, useRestaurarDePapelera, usePurgarDePapelera, type FilaPapelera } from './usePapelera';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
+import type { FilaPapelera } from './tipos';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
@@ -9,24 +10,27 @@ import type { ReactNode } from 'react';
 
 const ETIQUETA_TIPO: Record<FilaPapelera['tipo'], ReactNode> = {
   proveedor: <><Icono n="fabrica" /> Proveedor</>,
-  repuesto: <><Icono n="herramienta" /> Repuesto</>,
+  repuesto: <><Icono n="herramienta" /> Artículo</>,
   reparacion: <><Icono n="herramienta" /> Reparación</>,
   envio: <><Icono n="paquete" /> Envío</>,
 };
 
 export default function PapeleraPane() {
-  const { data: filas, isLoading, isError } = usePapeleraQuery();
-  const restaurar = useRestaurarDePapelera();
-  const purgar = usePurgarDePapelera();
+  const { papelera, registrarError } = useServicioDeConfiguracion();
+  const pedido = usePedido('papelera', papelera.leer, true);
+  const filas = pedido.data;
+  const isLoading = filas === undefined && !pedido.error;
+  const isError = !!pedido.error;
   const toast = useToast();
   const confirmar = useConfirm();
 
   async function handleRestaurar(tipo: FilaPapelera['tipo'], id: string) {
     try {
-      await restaurar.mutateAsync({ tipo, id });
+      await papelera.restaurar(tipo, id);
+      pedido.recargar();
       toast('Restaurado', 'success');
     } catch (e) {
-      await registrarErrorAccion('Error al restaurar desde la Papelera', e);
+      await registrarError('Error al restaurar desde la Papelera', e);
       toast('Error al restaurar: ' + mensajeDeError(e), 'error');
     }
   }
@@ -34,10 +38,11 @@ export default function PapeleraPane() {
   async function handlePurgar(tipo: FilaPapelera['tipo'], id: string) {
     if (!(await confirmar('¿Eliminar esto DEFINITIVAMENTE? No se puede deshacer.', { textoConfirmar: 'Eliminar definitivamente', peligroso: true }))) return;
     try {
-      await purgar.mutateAsync({ tipo, id });
+      await papelera.purgar(tipo, id);
+      pedido.recargar();
       toast('Eliminado definitivamente', 'success');
     } catch (e) {
-      await registrarErrorAccion('Error al purgar desde la Papelera', e);
+      await registrarError('Error al purgar desde la Papelera', e);
       toast('Error al eliminar: ' + mensajeDeError(e), 'error');
     }
   }
@@ -50,7 +55,7 @@ export default function PapeleraPane() {
       <div className="empty-state">
         <div className="empty-icon"><Icono n="borrar" /></div>
         <h2>La papelera está vacía</h2>
-        <p>Lo que se elimine de Proveedores, Repuestos, Reparaciones o Envíos va a aparecer acá.</p>
+        <p>Lo que se elimine de Proveedores, Artículos, Reparaciones o Envíos va a aparecer acá.</p>
       </div>
     );
   }

@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useAlCambiar } from '../../lib/useAlCambiar';
-import { useAuth } from '../../auth/AuthContext';
-import type { Item } from '../items/useItems';
+import type { Item } from '../items/tipos';
 
 // De cada repuesto el carrito solo necesita estos tres datos (así sirve tanto con un resultado de búsqueda como con el repuesto completo).
 export type RepuestoParaElCarrito = Pick<Item, 'id' | 'codigo' | 'descripcion'>;
@@ -25,6 +24,9 @@ interface CartState {
 
 const RetiroCartContext = createContext<CartState | undefined>(undefined);
 
+// (para useSyncExternalStore: "ya se hidrató" no cambia nunca después, no hay a qué suscribirse)
+const sinSuscripcion = () => () => {};
+
 // Igual que retiroCartPendiente_${userId} en la app vieja: escapado por usuario
 // para que en una compu/tablet compartida del depósito nadie herede el carrito
 // de otro sin darse cuenta.
@@ -32,22 +34,30 @@ function cartKey(userId: string | undefined) {
   return `retiroCartPendiente_${userId ?? 'anon'}`;
 }
 
-export function RetiroCartProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+// Recibe de quién es la sesión (lo sabe cada app a su manera: Supabase en la de Vite, el servidor en la de Next).
+export function RetiroCartProvider({ usuarioId, children }: { usuarioId: string | undefined; children: ReactNode }) {
   const [cart, setCart] = useState<RetiroCartLine[]>([]);
+  // De quién es el carrito que ya se leyó: hasta leerlo no se guarda nada (no pisa lo guardado con el carrito vacío del arranque).
+  const [leidoDe, setLeidoDe] = useState<string | undefined | null>(null);
+  // En Next la pantalla llega armada del servidor, que no tiene el carrito: el primer dibujo del navegador tiene que coincidir con ese (si no,
+  // React rehace toda la pantalla), así que se lee recién al terminar de "hidratar". En la de Vite no hay servidor: se lee de entrada.
+  const hidratado = useSyncExternalStore(sinSuscripcion, () => true, () => false);
 
-  useAlCambiar([user?.id], () => {
+  useAlCambiar([usuarioId, hidratado], () => {
+    if (!hidratado) return;
+    let guardado: RetiroCartLine[] = [];
     try {
-      const raw = localStorage.getItem(cartKey(user?.id));
-      setCart(raw ? (JSON.parse(raw) as RetiroCartLine[]) : []);
-    } catch {
-      setCart([]);
-    }
+      const raw = localStorage.getItem(cartKey(usuarioId));
+      if (raw) guardado = JSON.parse(raw) as RetiroCartLine[];
+    } catch { /* sin carrito guardado */ }
+    setCart(guardado);
+    setLeidoDe(usuarioId);
   });
 
   useEffect(() => {
-    try { localStorage.setItem(cartKey(user?.id), JSON.stringify(cart)); } catch { /* noop */ }
-  }, [cart, user?.id]);
+    if (leidoDe !== usuarioId) return;
+    try { localStorage.setItem(cartKey(usuarioId), JSON.stringify(cart)); } catch { /* noop */ }
+  }, [cart, usuarioId, leidoDe]);
 
   function addItem(item: RepuestoParaElCarrito) {
     setCart(prev => {
@@ -73,7 +83,7 @@ export function RetiroCartProvider({ children }: { children: ReactNode }) {
 
   function clear() {
     setCart([]);
-    try { localStorage.removeItem(cartKey(user?.id)); } catch { /* noop */ }
+    try { localStorage.removeItem(cartKey(usuarioId)); } catch { /* noop */ }
   }
 
   return (

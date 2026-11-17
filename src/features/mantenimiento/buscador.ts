@@ -1,13 +1,13 @@
 import { formatearFechaSola } from '../../lib/fechaHoy';
 import type { Equipo, Intervencion, Manual, RepuestoCritico } from './tipos';
 
-// Buscador de equipos por palabras clave. Busca en los datos del equipo y también en su
-// historial, sus repuestos críticos y sus manuales. Sin importar tildes ni mayúsculas.
-// Con varias palabras, el equipo tiene que tener TODAS (en cualquier lugar).
+// Buscador de equipos por palabras clave (del diseño del socio). Busca en los datos del equipo y también en su historial, sus repuestos
+// críticos y sus manuales. Sin importar tildes ni mayúsculas. Con varias palabras, el equipo tiene que tener TODAS (en cualquier lugar).
+// Corre en el servidor (la acción buscarEquipos), con el historial que ya filtró la base.
 
 /** Minúsculas y sin tildes: "Compresión" → "compresion". */
 export function normalizar(texto: string): string {
-  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
 // Palabras que aparecen en casi todo y no ayudan a distinguir (igual que en el buscador de repuestos).
@@ -29,8 +29,8 @@ interface Campo {
 
 export interface Relacionados {
   intervenciones: Intervencion[];
-  repuestos: RepuestoCritico[];
-  manuales: Manual[];
+  repuestos: Pick<RepuestoCritico, 'codigo' | 'descripcion' | 'nota'>[];
+  manuales: Pick<Manual, 'nombre'>[];
   /** Si es un sub-equipo, su equipo principal ("bomba pasteurizador 2" encuentra la bomba del PA-02). */
   padre?: Equipo | null;
 }
@@ -51,15 +51,17 @@ function camposDe(e: Equipo, rel: Relacionados): Campo[] {
   if (rel.padre) campos.push({ donde: 'equipo principal', texto: `${rel.padre.codigo} ${rel.padre.nombre}`, peso: 5 });
   // El historial más nuevo primero, así el motivo muestra la vez más reciente.
   for (const i of [...rel.intervenciones].sort((a, b) => b.fecha.localeCompare(a.fecha))) {
-    campos.push({ donde: `historial ${formatearFechaSola(i.fecha)}`, texto: `${i.tipo} ${i.descripcion} ${i.repuestosUsados} ${i.realizadoPor}`, peso: 2 });
+    const c = i.correctivo;
+    const texto = [i.tipo, i.descripcion, i.repuestosUsados, ...i.tecnicos.map(t => t.nombre), c?.falla, c?.causa, c?.solucion].filter(Boolean).join(' ');
+    campos.push({ donde: `historial ${formatearFechaSola(i.fecha)}`, texto, peso: 2 });
   }
   for (const r of rel.repuestos) campos.push({ donde: 'repuestos críticos', texto: `${r.codigo} ${r.descripcion} ${r.nota}`, peso: 3 });
   for (const m of rel.manuales) campos.push({ donde: 'manuales', texto: m.nombre, peso: 2 });
   return campos.map(c => ({ ...c, texto: normalizar(c.texto) }));
 }
 
-export interface ResultadoBusqueda {
-  equipo: Equipo;
+export interface ResultadoBusqueda<E extends Equipo = Equipo> {
+  equipo: E;
   puntaje: number;
   /** Lugares donde coincidió, sin repetir ("nombre", "historial 12/09/2026"). */
   motivos: string[];
@@ -69,12 +71,12 @@ export interface ResultadoBusqueda {
  * Filtra y ordena los equipos según lo escrito. Sin palabras, devuelve todos (por nombre).
  * `relacionadosDe` da el historial, repuestos y manuales de cada equipo.
  */
-export function buscarEquipos(equipos: Equipo[], consulta: string, relacionadosDe: (equipoId: string) => Relacionados): ResultadoBusqueda[] {
+export function buscarEquipos<E extends Equipo>(equipos: E[], consulta: string, relacionadosDe: (equipoId: string) => Relacionados): ResultadoBusqueda<E>[] {
   const palabras = palabrasDeBusqueda(consulta);
   if (!palabras.length) {
     return [...equipos].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(equipo => ({ equipo, puntaje: 0, motivos: [] }));
   }
-  const resultados: ResultadoBusqueda[] = [];
+  const resultados: ResultadoBusqueda<E>[] = [];
   for (const equipo of equipos) {
     const campos = camposDe(equipo, relacionadosDe(equipo.id));
     let puntaje = 0;

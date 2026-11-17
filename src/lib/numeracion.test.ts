@@ -33,7 +33,7 @@ describe('filtrarOpciones', () => {
 });
 
 describe('analizarNumeros', () => {
-  it('sin repuestos, empieza por 00001', () => {
+  it('sin artículos, empieza por 00001', () => {
     expect(analizarNumeros([])).toEqual({ siguiente: '00001', ultimo: null, enBlanco: [], huecos: [], totalHuecos: 0 });
   });
   it('sugiere el siguiente al más alto, con ceros', () => {
@@ -47,7 +47,7 @@ describe('analizarNumeros', () => {
   it('entiende números guardados sin ceros', () => {
     expect(analizarNumeros([r('7'), r('23')]).siguiente).toBe('00024');
   });
-  it('detecta los repuestos sin descripción (vacía o solo espacios), ordenados por número', () => {
+  it('detecta los artículos sin descripción (vacía o solo espacios), ordenados por número', () => {
     const a = analizarNumeros([r('00005'), r('00009', ''), r('00003', '   '), r('00004', null)]);
     expect(a.enBlanco.map(x => x.numero)).toEqual(['00003', '00004', '00009']);
   });
@@ -72,14 +72,14 @@ describe('analizarNumeros: números libres en el medio (huecos)', () => {
   it('el 1 también cuenta si nunca se usó', () => {
     expect(analizarNumeros([r('00002'), r('00004')]).huecos).toEqual(['00001', '00003']);
   });
-  it('sin huecos si los números son seguidos, y sin repuestos tampoco', () => {
+  it('sin huecos si los números son seguidos, y sin artículos tampoco', () => {
     expect(analizarNumeros([r('00001'), r('00002'), r('00003')]).totalHuecos).toBe(0);
     expect(analizarNumeros([]).huecos).toEqual([]);
   });
   it('entiende números guardados sin ceros', () => {
     expect(analizarNumeros([r('2'), r('4')]).huecos).toEqual(['00001', '00003']);
   });
-  it('un número usado por un repuesto sin descripción no es un hueco (ya está ocupado)', () => {
+  it('un número usado por un artículo sin descripción no es un hueco (ya está ocupado)', () => {
     expect(analizarNumeros([r('00001'), r('00002', ''), r('00004')]).huecos).toEqual(['00003']);
   });
   it('con muchos huecos trae solo los primeros pero cuenta todos', () => {
@@ -102,7 +102,7 @@ describe('analizarNumeros: números libres en el medio (huecos)', () => {
 
 describe('repuestoConNumero', () => {
   const lista = [r('00023', 'Rodamiento'), r('00004', '')];
-  it('encuentra el repuesto aunque se escriba sin ceros', () => {
+  it('encuentra el artículo aunque se escriba sin ceros', () => {
     expect(repuestoConNumero(lista, '23')?.codigo).toBe('MABPU00023');
     expect(repuestoConNumero(lista, '0023')?.codigo).toBe('MABPU00023');
   });

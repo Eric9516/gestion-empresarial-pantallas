@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import ResponsiveList, { type Column } from '../../components/ResponsiveList';
 import BotonVerMas from '../../components/BotonVerMas';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { useErrorLogsQuery, useLimpiarErrorLogs, type ErrorLogRow } from './useErrorLogs';
+import { usePaginas } from '../../lib/usePaginas';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
+import type { ErrorLogRow } from './tipos';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
@@ -32,15 +35,17 @@ function renderCard(r: ErrorLogRow) {
 }
 
 export default function ErroresPane() {
-  const { filas: rows, isLoading, isError, hayMas, cargandoMas, verMas } = useErrorLogsQuery();
-  const limpiar = useLimpiarErrorLogs();
+  const { errores: servicio } = useServicioDeConfiguracion();
+  const [vez, setVez] = useState(0);
+  const { filas: rows, isLoading, isError, hayMas, cargandoMas, verMas } = usePaginas(`errores|${vez}`, servicio.pagina);
   const toast = useToast();
   const confirmar = useConfirm();
 
   async function handleLimpiar() {
     if (!(await confirmar('¿Borrar todos los errores registrados?', { textoConfirmar: 'Borrar todo', peligroso: true }))) return;
     try {
-      await limpiar.mutateAsync();
+      await servicio.limpiar();
+      setVez(v => v + 1);
       toast('Log de errores limpiado', 'success');
     } catch (e) {
       toast('Error al limpiar: ' + mensajeDeError(e), 'error');

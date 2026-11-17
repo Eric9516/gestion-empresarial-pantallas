@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react';
 import {
-  ArrowLeft, Bug, Building2, Calendar, CalendarDays, Camera, ChartColumn, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleX, Clock, Crown, Download,
+  ArrowLeft, ArrowRightLeft, Bell, Bug, Building2, Calendar, CalendarDays, Camera, ChartColumn, Check, ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleX, Clock, Crown, Download,
   Eye, Factory, FileSpreadsheet, FileText, Folder, FolderOpen, Handshake, Hourglass, House, Image, KeyRound, Lightbulb, Lock, LockOpen, LogOut, Mail, MapPin, MessageSquare,
   Minus, NotebookPen, Package, PackageMinus, Palette, Pencil, Phone, Pin, Plus, Printer, Puzzle, RectangleHorizontal, RefreshCw, Rocket, Ruler, Save, Scale, ScrollText, Search,
   Settings, ShoppingCart, Smartphone, Sparkles, Square, SquareDashed, Star, Table, Tag, Target, Trash2, TrafficCone, TriangleAlert, Undo2, Upload, User, Users, Wrench, X,
-  ClipboardList, EllipsisVertical, LayoutGrid, List, Warehouse, BookUser, CircleHelp, Boxes, Truck, Store, FlaskConical,
+  ClipboardList, Cog, EllipsisVertical, LayoutGrid, List, Warehouse, BookUser, CircleHelp, Boxes, Truck, Store, FlaskConical, PanelLeft, PanelTop, PanelBottom, Copy, QrCode,
 } from 'lucide-react';
 
 // Los íconos de toda la app salen de acá, con un nombre que dice qué significan. Así todos tienen el mismo tamaño, trazo y color
@@ -19,11 +19,14 @@ const ICONOS = {
   usuario: User, usuarios: Users, empresa: Building2, fabrica: Factory, acuerdo: Handshake, paquete: Package, herramienta: Wrench, etiqueta: Tag,
   lista: ClipboardList, informe: ChartColumn, documento: FileText, planilla: FileSpreadsheet, tabla: Table, historial: ScrollText, nota: NotebookPen,
   fecha: Calendar, calendario: CalendarDays, reloj: Clock, espera: Hourglass,
-  telefono: Phone, celular: Smartphone, correo: Mail, lugar: MapPin, mensaje: MessageSquare, idea: Lightbulb,
+  telefono: Phone, celular: Smartphone, aviso: Bell, correo: Mail, lugar: MapPin, mensaje: MessageSquare, idea: Lightbulb,
   config: Settings, modulos: Puzzle, error: Bug, semaforo: TrafficCone, inicio: House, salir: LogOut, cohete: Rocket, nuevo: Sparkles, objetivo: Target,
-  camara: Camera, imagen: Image, carpeta: Folder, carpetaAbierta: FolderOpen, paleta: Palette, regla: Ruler, marco: SquareDashed, vacio: Square, ancho: RectangleHorizontal,
+  camara: Camera, qr: QrCode, cambiarArea: ArrowRightLeft, imagen: Image, carpeta: Folder, carpetaAbierta: FolderOpen, paleta: Palette, regla: Ruler, marco: SquareDashed, vacio: Square, ancho: RectangleHorizontal,
   cajas: Boxes, camion: Truck, tienda: Store, laboratorio: FlaskConical,
-  fijar: Pin, ayuda: CircleHelp, deposito: Warehouse, directorio: BookUser, balanza: Scale, estrella: Star, carrito: ShoppingCart, vistaLista: List, vistaGrilla: LayoutGrid, masAcciones: EllipsisVertical,
+  menuLateral: PanelLeft, menuArriba: PanelTop, menuAbajo: PanelBottom,
+  fijar: Pin, ayuda: CircleHelp, deposito: Warehouse, directorio: BookUser, balanza: Scale, estrella: Star, carrito: ShoppingCart, vistaLista: List, vistaGrilla: LayoutGrid, masAcciones: EllipsisVertical, copiar: Copy,
+  // Mantenimiento (el área de los equipos): distinto de la llave, que suele ser el ícono del depósito de repuestos
+  mantenimiento: Cog,
 } as const;
 
 export type NombreIcono = keyof typeof ICONOS;

@@ -3,7 +3,7 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { useSaveProveedor, type Proveedor } from './useProveedores';
+import type { GuardarProveedor, Proveedor } from './tipos';
 import { emptyProveedor, proveedorSchema, type ProveedorFormValues } from './proveedorSchema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,11 +17,12 @@ interface Props {
   open: boolean;
   onClose: () => void;
   proveedor: Proveedor | null; // null = alta nueva
+  /** Guarda el proveedor y sus contactos (cada app a su manera). Si alguien lo cambió en el medio, falla con ConflictoDeEdicion. */
+  guardar: GuardarProveedor;
 }
 
-export default function ProveedorForm({ open, onClose, proveedor }: Props) {
+export default function ProveedorForm({ open, onClose, proveedor, guardar }: Props) {
   const toast = useToast();
-  const saveProveedor = useSaveProveedor();
 
   const { register, control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ProveedorFormValues>({
     resolver: zodResolver(proveedorSchema),
@@ -55,7 +56,7 @@ export default function ProveedorForm({ open, onClose, proveedor }: Props) {
   async function onSubmit(values: ProveedorFormValues) {
     try {
       const { contactos, ...data } = values;
-      await saveProveedor.mutateAsync({ id: proveedor?.id ?? null, data, contactos, version: proveedor ? proveedor.updated_at : undefined });
+      await guardar({ id: proveedor?.id ?? null, data, contactos, version: proveedor ? proveedor.updated_at : undefined });
       toast(proveedor ? 'Proveedor actualizado' : 'Proveedor agregado', 'success');
       onClose();
     } catch (e) {

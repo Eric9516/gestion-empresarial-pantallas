@@ -5,54 +5,65 @@
 - **Esto vale también para cambios chicos** (poner un nombre a un campo, mover un botón), para instalar paquetes y para guardar o subir con git.
 - **Ante la duda, preguntá.** Una pregunta por vez, con palabras simples y, si se puede, con opciones para elegir. Es mejor hacer diez preguntas de más que una pantalla equivocada.
 - Este proyecto arranca en **modo plan**. No salgas de ese modo ni pidas permisos amplios por tu cuenta.
-- **No programes ni armes nada hasta terminar la entrevista y que la propuesta esté aprobada** (ver "Cómo se trabaja").
+- **No programes ni armes nada hasta que la propuesta esté aprobada** (ver "Cómo se trabaja").
 
 ## Qué es esto y con quién hablás
-Esta carpeta tiene **solo las pantallas** de "Gestión empresarial", un sistema para empresas (React 19 + TypeScript + Vite). No hay base de datos acá y no se crea ninguna.
+Esta carpeta es una copia de **la app real de "Gestión empresarial"** (la que usa la empresa): Next.js 16 + React 19 + TypeScript, con una
+base de datos PostgreSQL que corre en esta computadora (PGlite) y que trae **solo datos inventados**.
 La persona que te habla es el **encargado de mantenimiento** de una planta y **no sabe programar**. Explicale todo en español simple, sin jerga, de a una cosa por vez.
-Tu trabajo es ayudarlo a **diseñar el módulo de Mantenimiento** (y recién después construir las pantallas). Eric conectará las pantallas con la base de datos más adelante.
+Tu trabajo es ayudarlo a **seguir diseñando el módulo de Mantenimiento** sobre la app real. Eric (el programador) revisa lo que suba y lo lleva a la app de la empresa.
 
-## Lo primero: leé `MODULO-MANTENIMIENTO.md`
-Ahí están el contexto del producto (**es genérico, para muchas empresas, no solo para esta planta**), el punto de partida, lo que está abierto y el método paso a paso. Leelo antes de proponer nada.
+## Lo primero: leé estos archivos
+- `COMO-QUEDO-MANTENIMIENTO.md`: cómo quedó armado el módulo en la app (lo que el encargado diseñó antes, ya funcionando, y en qué cambió).
+- `MODULO-MANTENIMIENTO.md` y `DECISIONES.md`: el producto (**es genérico, para muchas empresas, no solo para esta planta**) y lo que se decidió.
+- `NOTAS-PARA-ERIC.md`: lo que el encargado le dejó anotado a Eric.
+Su app anterior (la vieja, de antes de la app nueva) está guardada en git con la marca `app-vieja`, por si hace falta mirar cómo era algo (`git show app-vieja:<archivo>`). No se trae tal cual: la app nueva funciona distinto.
+
+## Cómo está armada la app (lo necesario para no perderse)
+- `web/src/app/(app)/mantenimiento/`: las **páginas** del módulo (cada carpeta es una dirección: `inicio`, `equipos`, `ordenes`, `calendario`, `sector/[id]`…) y las **acciones** (`acciones*.ts`: lo que lee y guarda en la base, siempre en el servidor y con los permisos de cada persona).
+- `src/features/mantenimiento/`: los **componentes** de las pantallas (fichas, formularios, listas) y la lógica que no depende de la base (fechas, circuito de las OT, costos), con sus pruebas (`*.test.ts`).
+- `src/components/` y `src/components/ui/`: botones, ventanas, campos… compartidos por toda la app. `src/styles/`: los estilos.
+- `supabase/componentes/` y `web/db/`: **la base de datos** (tablas, reglas y permisos). Es de Eric: no se toca.
+- `arrancar/`: lo que arranca la app y la base con los datos de ejemplo (`arrancar/base.mjs` tiene los datos inventados).
 
 ## Cómo se trabaja (siempre en este orden)
-0. **Mirar lo que ya existe, solo lectura:** las carpetas de manuales y planillas del encargado. Nunca modificar, mover ni borrar nada de ellas. Primero la estructura; antes de abrir a fondo una planilla o un PDF, decir qué es y esperar el visto bueno.
-1. **Entrevista:** todas las preguntas necesarias, de a una por vez, sobre cómo trabajan hoy.
-2. **Propuesta:** mostrar las pantallas con palabras y esquemas simples, **sin programar**, y ajustarlas juntos.
+1. **Entender el pedido:** las preguntas necesarias, de a una por vez. Mirar primero cómo está hoy en la app (en el navegador y en el código, solo lectura).
+2. **Propuesta:** contar qué pantallas cambian y cómo, con palabras y esquemas simples, **sin programar**, y ajustarla juntos.
 3. **Aprobación explícita** del encargado ("dale, armalo"). Una etapa por vez.
-4. **Construcción y revisión** con datos de ejemplo inventados, probando en el navegador.
-Dejá lo decidido por escrito (ver `MODULO-MANTENIMIENTO.md`, sección 5).
+4. **Construcción y revisión** probando en el navegador (`pnpm run dev`), también en ancho de celular, con los usuarios de ejemplo de cada rol.
+Dejá lo decidido por escrito en `DECISIONES.md`.
 
 ## Lo que SÍ hacés (cuando ya está aprobado)
-- Todo lo nuevo va en `src/features/mantenimiento/`. El módulo tiene **su propia pantalla**, `src/pages/MantenimientoPage.tsx`, que todavía no existe: se crea. El Depósito es otra pantalla (`src/pages/DepositoPage.tsx`) y no se toca.
-- Para enganchar la pantalla nueva: su ruta `/mantenimiento` en `src/App.tsx` (hoy esa dirección lleva al Depósito, por los marcadores viejos: se reemplaza por la pantalla nueva) y su entrada en el menú de áreas, igual que Directorio y Depósito.
-- Parecerte a lo que ya existe: componentes de `src/components/` y `src/components/ui/`, estilos de `src/styles/`, y el estilo de `src/features/reparaciones/` e `src/features/items/`.
-- Íconos: siempre `<Icono n="nombre" />` (`src/components/Icono.tsx`). **Nunca emojis ni símbolos sueltos** (✓, ●, ⋮…): hay una prueba que lo controla. Si falta un ícono, se agrega una línea en ese archivo.
+- Cambiar y crear pantallas y componentes de Mantenimiento: `web/src/app/(app)/mantenimiento/` y `src/features/mantenimiento/`.
+- Usar los datos que la app ya tiene: las acciones que existen (`acciones*.ts`) y lo que ya traen las páginas.
+- Parecerte a lo que ya existe: componentes de `src/components/` y `src/components/ui/`, estilos de `src/styles/`.
+- Íconos: siempre `<Icono n="nombre" />` (`src/components/Icono.tsx`). **Nunca emojis ni símbolos sueltos** (✓, ●, ⋮…). Si falta un ícono, se agrega una línea en ese archivo.
 - Textos en español rioplatense (vos), como el resto de la app. **Pensá primero en el celular.**
 - Palabras neutras (no propias de una fábrica) en lo que ve el usuario, y lo que una empresa pueda querer distinto, como **opción configurable**.
 
-## Datos nuevos: siempre detrás de un "hook"
-Las tablas que ya existen se piden con el cliente de datos que ya usa la app (mirá los archivos `use*.ts` de cada carpeta de `src/features/`). Para lo que **todavía no existe en la base**, no inventes tablas ni llames a nada nuevo del servidor:
+## Datos que todavía no existen en la base
+**No crees tablas, columnas ni reglas** (no toques `supabase/` ni `web/db/`): eso lo hace Eric para que funcione igual en todas las empresas.
+Si una pantalla necesita algo nuevo:
 1. Definí los tipos en `src/features/mantenimiento/tipos.ts`.
-2. Poné datos de ejemplo **inventados** en `src/features/mantenimiento/datosDemo.ts`, marcados como ejemplo.
-3. Cada pantalla pide sus datos a una función propia (`useAlgo()`, en un archivo aparte) que **hoy devuelve los datos de ejemplo** con la misma forma que devolvería la base. Así Eric solo cambia el interior de esa función cuando conecte la base.
+2. Poné datos de ejemplo **inventados**, marcados como ejemplo, en un archivo aparte de `src/features/mantenimiento/` (por ejemplo `datosDeEjemplo.ts`).
+3. La pantalla los pide a una función propia (en un archivo aparte) que **hoy devuelve esos datos de ejemplo** con la forma que tendrían en la base. Así Eric solo cambia el interior de esa función cuando arme la base.
+4. Anotalo en `NOTAS-PARA-ERIC.md`: qué datos hacen falta, quién puede verlos o cambiarlos.
 
 ## Lo que NO hacés (sin preguntarle antes a Eric)
-- No toques: `src/auth/`, `src/lib/types.ts`, `src/lib/database.types.ts`, `src/lib/modulos.ts`, `src/lib/modulos.json`, `src/lib/supabaseClient.ts`, ni nada de permisos o licencias.
-- No cambies las pantallas que ya existen (Directorio, Depósito, Tareas, Configuración) salvo para enganchar el módulo nuevo.
-- No agregues librerías (`pnpm add`) ni cambies `package.json`, `vite.config.ts` o `tsconfig*.json`.
-- **No subas, imprimas ni pidas contraseñas o claves.** El `.env` de este repositorio trae solo la dirección y la clave **pública** de una base de pruebas: no lo cambies ni agregues otras claves a ningún archivo.
+- No toques: `supabase/`, `web/db/`, `arrancar/`, `web/src/lib/` (sesión, base, permisos), `web/src/proxy.ts`, `src/lib/types.ts`, `src/lib/modulos*`, ni nada de permisos, licencias o usuarios.
+- No cambies las otras áreas (Directorio, Depósito, Compras, Tareas, Configuración) salvo lo justo para enganchar algo de Mantenimiento, y avisando.
+- No agregues librerías (`pnpm add`, `npm install <algo>`) ni cambies `package.json`, `next.config.ts` o `tsconfig*.json`.
+- **No subas, imprimas ni pidas contraseñas o claves reales.** Los usuarios de ejemplo (`…@ejemplo.test`, contraseña `Ejemplo-2026`) son inventados y solo existen en esta computadora.
 - **No copies al repositorio el contenido de manuales, planillas ni datos reales** de la empresa (este repositorio se sube a GitHub). Solo estructura y conclusiones.
-- No borres ni modifiques datos en masa de la base a la que se conecta la app: es una copia de datos reales. Para probar, creá registros que digan "PRUEBA".
 - No compartas ni copies este código fuera de esta computadora.
 
 ## Cómo entregás
-1. Antes de dar un tramo por terminado: `pnpm test`, `pnpm lint` y `pnpm build` tienen que pasar sin errores. Probalo en el navegador (`pnpm run dev`), también en ancho de celular, y decile a la persona qué mirar.
+1. Antes de dar un tramo por terminado: `pnpm test`, `pnpm lint` y `pnpm typecheck` tienen que pasar sin errores. Probalo en el navegador (`pnpm run dev`), también en ancho de celular, y decile a la persona qué mirar.
 2. Cuando la persona lo pida ("guardá los cambios y subilos"): `git commit` con mensajes claros y `git push` (rama `main`, la única que hay).
-3. Al terminar cada etapa, actualizá `NOTAS-PARA-ERIC.md` (qué datos necesita cada pantalla, quién puede ver o cambiar qué, qué opciones configurables hay).
+3. Al terminar cada etapa, actualizá `NOTAS-PARA-ERIC.md` y `DECISIONES.md`.
 
 ## Datos útiles
-- Idioma de la interfaz: español (Argentina), fechas con `es-AR`.
-- Los módulos de la app se prenden y apagan por cliente. Mantenimiento ya existe como módulo (hoy tiene solo una tabla simple de equipos).
-- Cuidado con un nombre viejo: en la base, el rol de una persona **sobre el Depósito** se llama `mantenimiento_rol` (y en pantalla `isDepositoAdmin`, `tieneAccesoDeposito`). No es un rol del módulo Mantenimiento: si el módulo necesita roles propios (quién asigna órdenes de trabajo, quién las ejecuta), anotalo en `NOTAS-PARA-ERIC.md`. Las **reparaciones** (lo que se manda a reparar afuera) **no son de Mantenimiento**: son del Depósito. El módulo nuevo va dentro de Mantenimiento.
-- Las pruebas (`pnpm test`) son rápidas y no necesitan internet.
+- `pnpm run dev` arranca todo (la base de ejemplo y la app en http://localhost:3020). Los usuarios de ejemplo están en `LEEME.md`. `pnpm run datos-nuevos` vuelve la base a los datos de ejemplo.
+- Roles de Mantenimiento (columna `rol_equipos` de la persona): **responsable** (`admin`: equipos, rutinas, planillas, configuración del módulo), **jefe** de taller (asigna y revisa las OT), **técnico** (hace las OT) y **consulta** (solo mira). El dueño puede todo. El calendario lo ven los dueños y a quien se le dé el permiso.
+- Cuidado con un nombre viejo: `mantenimiento_rol` es el rol de la persona **en el Depósito**, no en Mantenimiento. Las **reparaciones** (lo que se manda a reparar afuera) son del Depósito.
+- Idioma de la interfaz: español (Argentina), fechas con `es-AR`. Las pruebas (`pnpm test`) son rápidas y no necesitan internet.

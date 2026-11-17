@@ -2,20 +2,19 @@ import { useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
 import { fechaHoyISO } from '../../lib/fechaHoy';
 import { useAlCambiar } from '../../lib/useAlCambiar';
+import { irAlCampo } from '../../lib/irAlCampo';
 import {
   formatoCantidad, leerCantidad, MOTIVOS, NOMBRE_DE_LA_CLASE, problemaDelMovimiento, resumenDelAjuste, stockResultante,
   type ClaseMovimiento, type TipoAjuste,
 } from '../../lib/ajustes';
-import { useRepuestosParaElegir } from '../items/useItems';
-import { supabase } from '../../lib/supabaseClient';
-import { useCrearMovimiento } from './useAjustes';
+import { useRepuestosQueCoinciden, type BuscarRepuestos } from '../items/useRepuestosQueCoinciden';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Icono } from '@/components/Icono';
+import { avisoDelCampo } from '@/components/ui/campo';
 import { mensajeDeError } from '@/lib/errores';
 
 interface Linea {
@@ -30,6 +29,18 @@ interface Linea {
 
 export interface RepuestoParaMovimiento { id: string; codigo: string; descripcion: string; stock: number | null; unidad?: string | null }
 
+export interface MovimientoNuevo { clase: ClaseMovimiento; fecha: string; motivo: string; referencia: string; observaciones: string; lineas: { item_id: string; tipo: TipoAjuste; cantidad: number }[] }
+
+/** Lo que la ventana necesita hacer; cada app lo pone a su manera (Supabase en la de Vite, el servidor en la de Next). */
+export interface AccionesDeMovimiento {
+  /** Registra la carga o el ajuste (todo o nada) y devuelve su comprobante. */
+  crear: (m: MovimientoNuevo) => Promise<{ comprobante: string }>;
+  /** El stock y la unidad de un repuesto tal como están ahora. */
+  leerRepuesto: (id: string) => Promise<{ stock: number | null; unidad: string | null }>;
+  buscarRepuestos: BuscarRepuestos;
+  registrarError: (descripcion: string, err: unknown) => Promise<void>;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -37,14 +48,18 @@ interface Props {
   claseInicial?: ClaseMovimiento;
   /** Un repuesto que ya viene cargado (por ejemplo, al tocar "Cambiar stock" en su ficha). */
   repuestoInicial?: RepuestoParaMovimiento | null;
+  /** El motivo y la referencia con que se abre (por ejemplo, la devolución de un retiro). */
+  motivoInicial?: string;
+  referenciaInicial?: string;
+  acciones: AccionesDeMovimiento;
 }
 
 const OTRO = 'Otro';
 
 // Una carga de stock (entra mercadería: solo suma) o un ajuste (corrige el stock: cada artículo suma o resta), de varios artículos a la vez. Es un documento con su
 // número correlativo; cada línea muestra cuánto había y cuánto va a quedar.
-export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'carga', repuestoInicial = null }: Props) {
-  const crear = useCrearMovimiento();
+export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'carga', repuestoInicial = null, motivoInicial = '', referenciaInicial = '', acciones }: Props) {
+  const [guardando, setGuardando] = useState(false);
   const toast = useToast();
   const confirmar = useConfirm();
 
@@ -56,15 +71,20 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
   const [observaciones, setObservaciones] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [lineas, setLineas] = useState<Linea[]>([]);
+  // Se tocó Guardar con algo sin completar: desde ahí se marca en rojo lo que falta (antes no, para no retar a quien recién empieza)
+  const [revisar, setRevisar] = useState(false);
 
   function linea(it: RepuestoParaMovimiento, tipo: TipoAjuste): Linea {
     return { item_id: it.id, codigo: it.codigo, descripcion: it.descripcion, unidad: it.unidad ?? 'Uni', stock: it.stock, tipo, texto: '' };
   }
 
   // Cada vez que se abre, arranca limpio (con el repuesto que venga pedido, si hay uno).
-  useAlCambiar([open, claseInicial, repuestoInicial?.id], () => {
+  useAlCambiar([open, claseInicial, repuestoInicial?.id, motivoInicial, referenciaInicial], () => {
     if (!open) return;
-    setClase(claseInicial); setFecha(fechaHoyISO()); setMotivoElegido(''); setMotivoPropio(''); setReferencia(''); setObservaciones(''); setBusqueda('');
+    const motivoDeLaLista = MOTIVOS[claseInicial].includes(motivoInicial);
+    setClase(claseInicial); setFecha(fechaHoyISO()); setMotivoElegido(motivoInicial && !motivoDeLaLista ? OTRO : motivoInicial);
+    setMotivoPropio(motivoDeLaLista ? '' : motivoInicial); setReferencia(referenciaInicial); setObservaciones(''); setBusqueda('');
+    setRevisar(false);
     setLineas(repuestoInicial ? [linea(repuestoInicial, claseInicial === 'carga' ? 'suma' : 'resta')] : []);
   });
 
@@ -77,10 +97,22 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
 
   const motivo = motivoElegido === OTRO ? motivoPropio : motivoElegido;
 
-  const resultados = useRepuestosParaElegir(busqueda);
+  const resultados = useRepuestosQueCoinciden(busqueda, acciones.buscarRepuestos);
 
   const datos = lineas.map(l => ({ tipo: l.tipo, cantidad: leerCantidad(l.texto), stock: l.stock }));
   const problema = problemaDelMovimiento(clase, datos, motivo);
+  const faltaMotivo = clase === 'ajuste' && !motivo.trim();
+  const lineaMal = (l: Linea) => {
+    const cantidad = leerCantidad(l.texto);
+    return cantidad === null || (l.tipo === 'resta' && stockResultante(l.stock, 'resta', cantidad) < 0);
+  };
+  // El campo del problema, en el mismo orden en que los revisa problemaDelMovimiento
+  function campoDelProblema(): string | null {
+    if (!lineas.length) return repuestoInicial ? null : 'mov-buscar';
+    if (faltaMotivo) return motivoElegido === OTRO ? 'mov-motivo-propio' : 'mov-motivo';
+    const mala = lineas.find(lineaMal);
+    return mala ? `mov-cant-${mala.item_id}` : null;
+  }
   const resumen = resumenDelAjuste(datos);
   const unidadesTotales = resumen.unidadesSumadas + resumen.unidadesRestadas;
 
@@ -89,8 +121,8 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
   // Al agregar se pide el repuesto tal como está AHORA (stock y unidad de medida): lo que se ve en la línea es lo real, no lo de una lista vieja.
   async function agregar(it: { id: string; codigo: string; descripcion: string }) {
     if (lineas.some(l => l.item_id === it.id)) { toast('Ese artículo ya está en la lista', 'error'); return; }
-    const { data, error } = await supabase.from('items').select('stock, unidad').eq('id', it.id).single();
-    if (error) { toast('No se pudo leer el repuesto: ' + mensajeDeError(error), 'error'); return; }
+    let data: { stock: number | null; unidad: string | null };
+    try { data = await acciones.leerRepuesto(it.id); } catch (error) { toast('No se pudo leer el artículo: ' + mensajeDeError(error), 'error'); return; }
     setLineas(prev => (prev.some(l => l.item_id === it.id) ? prev : [...prev, linea({ ...it, stock: data.stock, unidad: data.unidad }, clase === 'carga' ? 'suma' : 'resta')]));
     setBusqueda('');
   }
@@ -98,26 +130,29 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
   const cambiar = (id: string, cambio: Partial<Linea>) => setLineas(prev => prev.map(l => (l.item_id === id ? { ...l, ...cambio } : l)));
 
   async function handleConfirmar() {
-    if (problema) { toast(problema, 'error'); return; }
+    if (problema) { setRevisar(true); toast(problema, 'error'); irAlCampo(campoDelProblema()); return; }
     const partes = [
       resumen.sumas ? `sumar ${formatoCantidad(resumen.unidadesSumadas)} unidades en ${resumen.sumas} artículo${resumen.sumas === 1 ? '' : 's'}` : '',
       resumen.restas ? `restar ${formatoCantidad(resumen.unidadesRestadas)} unidades en ${resumen.restas} artículo${resumen.restas === 1 ? '' : 's'}` : '',
     ].filter(Boolean).join(' y ');
     const sigue = await confirmar(
-      `Vas a ${partes}. El stock cambia ahora y queda registrado con su número de comprobante, en el Historial y en cada repuesto. No se puede editar ni borrar: si hay un error, un dueño tiene que anularlo.`,
+      `Vas a ${partes}. El stock cambia ahora y queda registrado con su número de comprobante, en el Historial y en cada artículo. No se puede editar ni borrar: si hay un error, un dueño tiene que anularlo.`,
       { titulo: `Confirmar ${NOMBRE_DE_LA_CLASE[clase].toLowerCase()}`, textoConfirmar: clase === 'carga' ? 'Sí, cargar' : 'Sí, ajustar' },
     );
     if (!sigue) return;
+    setGuardando(true);
     try {
-      const r = await crear.mutateAsync({
+      const r = await acciones.crear({
         clase, fecha, motivo: motivo.trim(), referencia: referencia.trim(), observaciones: observaciones.trim(),
         lineas: lineas.map(l => ({ item_id: l.item_id, tipo: l.tipo, cantidad: leerCantidad(l.texto) as number })),
       });
       toast(`${NOMBRE_DE_LA_CLASE[clase]} registrada: ${r.comprobante}`, 'success');
       handleClose();
     } catch (err) {
-      await registrarErrorAccion('Error al registrar un movimiento de stock', err);
+      await acciones.registrarError('Error al registrar un movimiento de stock', err);
       toast('No se pudo registrar: ' + mensajeDeError(err), 'error');
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -130,8 +165,8 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
       footer={
         <>
           <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
-          <Button variant="success" disabled={crear.isPending || !!problema} onClick={() => void handleConfirmar()} title={problema ?? undefined}>
-            {crear.isPending ? 'Guardando...' : `${clase === 'carga' ? 'Guardar la carga' : 'Guardar el ajuste'}${lineas.length ? ` (${lineas.length})` : ''}`}
+          <Button variant="success" disabled={guardando} onClick={() => void handleConfirmar()}>
+            {guardando ? 'Guardando...' : `${clase === 'carga' ? 'Guardar la carga' : 'Guardar el ajuste'}${lineas.length ? ` (${lineas.length})` : ''}`}
           </Button>
         </>
       }
@@ -154,15 +189,18 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
         </div>
         <div className="form-group">
           <label htmlFor="mov-motivo">Motivo{clase === 'ajuste' ? ' (obligatorio)' : ''}</label>
-          <Select id="mov-motivo" value={motivoElegido} onChange={e => setMotivoElegido(e.target.value)}>
+          <Select id="mov-motivo" value={motivoElegido} aria-invalid={revisar && faltaMotivo && motivoElegido !== OTRO} onChange={e => setMotivoElegido(e.target.value)}>
             <option value="">{clase === 'carga' ? 'Carga de stock' : 'Elegí un motivo…'}</option>
             {MOTIVOS[clase].map(m => <option key={m} value={m}>{m}</option>)}
           </Select>
+          {revisar && faltaMotivo && motivoElegido !== OTRO && <p className={avisoDelCampo}>Elegí el motivo del ajuste.</p>}
         </div>
         {motivoElegido === OTRO && (
           <div className="form-group full">
             <label htmlFor="mov-motivo-propio">Escribí el motivo</label>
-            <Input id="mov-motivo-propio" type="text" maxLength={500} placeholder="Ej: conteo físico de octubre" value={motivoPropio} onChange={e => setMotivoPropio(e.target.value)} />
+            <Input id="mov-motivo-propio" type="text" maxLength={500} placeholder="Ej: conteo físico de octubre" value={motivoPropio} aria-invalid={revisar && faltaMotivo}
+              onChange={e => setMotivoPropio(e.target.value)} />
+            {revisar && faltaMotivo && <p className={avisoDelCampo}>Escribí el motivo del ajuste.</p>}
           </div>
         )}
         <div className="form-group">
@@ -175,9 +213,14 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
         </div>
       </div>
 
+      {/* Abierta desde un repuesto ("Cambiar stock…" en su ficha), el repuesto queda fijo: no hay que buscar otro ni se puede quitar.
+          Desde Depósito → Movimientos se buscan y agregan varios. */}
+      {!repuestoInicial && <>
       <div className="form-group full" style={{ margin: '8px 0' }}>
         <label htmlFor="mov-buscar">Buscar artículo</label>
-        <Input id="mov-buscar" type="text" placeholder="Código, número o descripción..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        <Input id="mov-buscar" type="text" placeholder="Código, número o descripción..." value={busqueda} aria-invalid={revisar && !lineas.length}
+          onChange={e => setBusqueda(e.target.value)} />
+        {revisar && !lineas.length && <p className={avisoDelCampo}>Buscá y agregá al menos un artículo.</p>}
       </div>
       {busqueda.trim() && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
@@ -191,6 +234,7 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
           )) : <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin resultados</p>}
         </div>
       )}
+      </>}
 
       {!lineas.length && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Todavía no agregaste ningún artículo.</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -214,8 +258,12 @@ export default function NuevoMovimientoModal({ open, onClose, claseInicial = 'ca
                 </div>
               )}
               <label htmlFor={`mov-cant-${l.item_id}`} style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cantidad ({l.unidad}):</label>
-              <Input id={`mov-cant-${l.item_id}`} type="text" inputMode="decimal" placeholder="0" style={{ width: 80 }} value={l.texto} onChange={e => cambiar(l.item_id, { texto: e.target.value })} />
-              <Button variant="dangerGhost" size="icon" title="Quitar" aria-label={`Quitar ${l.codigo}`} onClick={() => setLineas(prev => prev.filter(x => x.item_id !== l.item_id))}><Icono n="cerrar" /></Button>
+              <Input id={`mov-cant-${l.item_id}`} type="text" inputMode="decimal" placeholder="0" style={{ width: 80 }} value={l.texto}
+                aria-invalid={negativo || (revisar && cantidad === null)} onChange={e => cambiar(l.item_id, { texto: e.target.value })} />
+              {revisar && cantidad === null && <span className={avisoDelCampo} style={{ marginTop: 0 }}>Poné una cantidad mayor que cero.</span>}
+              {!repuestoInicial && (
+                <Button variant="dangerGhost" size="icon" title="Quitar" aria-label={`Quitar ${l.codigo}`} onClick={() => setLineas(prev => prev.filter(x => x.item_id !== l.item_id))}><Icono n="cerrar" /></Button>
+              )}
             </div>
           );
         })}

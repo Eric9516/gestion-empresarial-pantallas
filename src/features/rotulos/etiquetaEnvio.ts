@@ -1,4 +1,4 @@
-import type { RotuloGenerado } from './useRotulos';
+import type { RotuloGenerado } from './tipos';
 
 type EnvioParaEtiqueta = Pick<RotuloGenerado, 'tipo_documento' | 'numero_documento' | 'extra' | 'comentario' | 'created_at'>;
 

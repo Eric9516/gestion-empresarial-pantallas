@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { useAuth } from '../../auth/AuthContext';
 import { isOwner, puedeResetearContrasenas } from '../../lib/types';
 import ResponsiveList, { type Column } from '../../components/ResponsiveList';
-import { useUsuariosQuery, type Usuario } from './useUsuarios';
+import { usePedido } from '../../lib/usePedido';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
+import type { Usuario } from './tipos';
 import UsuarioForm from './UsuarioForm';
 import ResetPasswordModal from './ResetPasswordModal';
 import { Button } from '@/components/ui/button';
-import { useModulos } from '../config/useModulos';
 import { Icono } from '@/components/Icono';
 
 const MANT_LABELS: Record<string, string> = { admin: 'Admin', comun: 'Usuario' };
+const EQUIPOS_LABELS: Record<string, string> = { admin: 'Responsable', jefe: 'Jefe de taller', tecnico: 'Técnico', consulta: 'Consulta' };
 const ROL_BADGE: Record<string, { cls: string; label: string }> = {
   admin: { cls: 'badge-rubro', label: 'Admin' },
   user: { cls: 'badge-active', label: 'Usuario' },
@@ -17,9 +18,11 @@ const ROL_BADGE: Record<string, { cls: string; label: string }> = {
 };
 
 export default function UsuariosPane() {
-  const { profile } = useAuth();
-  const { data: usuarios, isLoading, isError } = useUsuariosQuery();
-  const { modulos } = useModulos();
+  const { perfil: profile, modulos, usuarios: servicio, abrirUsuario } = useServicioDeConfiguracion();
+  const pedido = usePedido('usuarios', servicio.leer, true);
+  const usuarios = pedido.data;
+  const isLoading = usuarios === undefined && !pedido.error;
+  const isError = !!pedido.error;
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Usuario | null>(null);
@@ -28,7 +31,9 @@ export default function UsuariosPane() {
   const owner = isOwner(profile);
   const puedeResetear = puedeResetearContrasenas(profile);
 
-  function abrirEditar(u: Usuario) {
+  // en la app de Next, la ficha es una página propia; en la de Vite, una ventana flotante
+  function abrirEditar(u: Usuario | null) {
+    if (abrirUsuario) { abrirUsuario(u?.id ?? null); return; }
     setEditing(u);
     setFormOpen(true);
   }
@@ -36,7 +41,10 @@ export default function UsuariosPane() {
   function badges(u: Usuario) {
     return (
       <>
-        {modulos.deposito && (u.mantenimiento_rol ? <span className="badge badge-rubro">{MANT_LABELS[u.mantenimiento_rol]}</span> : <span className="badge badge-inactive">Desactivado</span>)}
+        {modulos.deposito && u.es_owner !== true && (u.depositos?.length
+          ? <span className="badge badge-rubro" title={`Depósitos: ${u.depositos.length}`}><Icono n="deposito" /> {u.depositos.length === 1 ? MANT_LABELS[u.depositos[0].rol] : `${u.depositos.length} depósitos`}</span>
+          : <span className="badge badge-inactive">Sin depósito</span>)}
+        {modulos.mantenimiento && u.rol_equipos && <span className="badge badge-rubro" title="Rol en Mantenimiento"><Icono n="herramienta" /> {EQUIPOS_LABELS[u.rol_equipos] ?? u.rol_equipos}</span>}
         {modulos.deposito && u.mantenimiento_rol && u.puede_ver_retiros &&<span className="badge badge-active" title="Puede ver los retiros de todos">  <Icono n="ver" /> Retiros</span>}
         {u.puede_ver_errores && <span className="badge badge-active" title="Puede ver el log de errores">  <Icono n="error" /></span>}
       </>
@@ -93,7 +101,7 @@ export default function UsuariosPane() {
       <div className="admin-card-header" style={{ justifyContent: 'space-between' }}>
         <span><Icono n="usuarios" /> Usuarios</span>
         {owner && (
-          <Button size="sm" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 12 }} onClick={() => { setEditing(null); setFormOpen(true); }}>+ Nuevo usuario</Button>
+          <Button size="sm" style={{ background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 12 }} onClick={() => abrirEditar(null)}>+ Nuevo usuario</Button>
         )}
       </div>
       <div className="admin-card-body" style={{ padding: usuarios?.length ? 0 : 18 }}>
@@ -111,7 +119,7 @@ export default function UsuariosPane() {
           />
         )}
       </div>
-      <UsuarioForm open={formOpen} onClose={() => setFormOpen(false)} usuario={editing} />
+      <UsuarioForm open={formOpen} onClose={() => { setFormOpen(false); pedido.recargar(); }} usuario={editing} />
       <ResetPasswordModal open={!!resetPasswordUsuario} onClose={() => setResetPasswordUsuario(null)} usuario={resetPasswordUsuario} />
     </div>
   );

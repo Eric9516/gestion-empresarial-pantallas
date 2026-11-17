@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Modal from '../../components/Modal';
-import { useEquiposQuery } from './useEquipos';
+import { useMantenimiento } from './servicio';
 import { Icono } from '@/components/Icono';
 
 const MENSAJE_INICIAL = 'Apuntá al código QR pegado en el equipo...';
@@ -11,13 +11,13 @@ interface Props {
   onEncontrado: (equipoId: string) => void;
 }
 
-// Escanea el QR de un equipo (lleva su código) y abre su ficha. Mismo mecanismo que el
-// escáner de repuestos del Depósito (cámara + jsQR), pero busca entre los equipos.
+// Escanea el QR de un equipo (lleva su código) y abre su ficha (del diseño del socio). Mismo mecanismo que el escáner de repuestos del
+// Depósito (cámara + jsQR), pero busca entre los equipos.
 export default function EscanerEquipoModal({ open, onClose, onEncontrado }: Props) {
-  const { data: equipos } = useEquiposQuery();
-  const equiposRef = useRef(equipos);
+  const { equipos } = useMantenimiento();
+  const equiposRef = useRef(equipos ?? []);
   const onEncontradoRef = useRef(onEncontrado);
-  useEffect(() => { equiposRef.current = equipos; onEncontradoRef.current = onEncontrado; });
+  useEffect(() => { equiposRef.current = equipos ?? []; onEncontradoRef.current = onEncontrado; });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mensaje, setMensaje] = useState<ReactNode>(MENSAJE_INICIAL);
@@ -38,7 +38,7 @@ export default function EscanerEquipoModal({ open, onClose, onEncontrado }: Prop
 
     mostrar(MENSAJE_INICIAL, false);
     if (!navigator.mediaDevices?.getUserMedia) {
-      mostrar('Tu navegador no permite usar la cámara acá (¿estás en https:// o localhost?).', true);
+      mostrar('Tu navegador no permite usar la cámara acá.', true);
       return;
     }
 
@@ -56,7 +56,7 @@ export default function EscanerEquipoModal({ open, onClose, onEncontrado }: Prop
           if (v && v.readyState === v.HAVE_ENOUGH_DATA) {
             canvas.width = v.videoWidth;
             canvas.height = v.videoHeight;
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) {
               ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
               const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -86,7 +86,7 @@ export default function EscanerEquipoModal({ open, onClose, onEncontrado }: Prop
   return (
     <Modal open={open} onClose={onClose} title={<><Icono n="camara" /> Escanear equipo</>}>
       <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', borderRadius: 'var(--radius-sm)', background: '#000', display: 'block' }} />
-      <div style={{ textAlign: 'center', fontSize: 13, color: error ? 'var(--danger)' : 'var(--text-muted)', marginTop: 10, minHeight: 18 }}>{mensaje}</div>
+      <div style={{ textAlign: 'center', fontSize: 13, color: error ? 'var(--danger)' : 'var(--text-muted)', marginTop: 10, minHeight: 18 }} aria-live="polite">{mensaje}</div>
       <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 10 }}>
         Las etiquetas QR de los equipos se imprimen desde la ficha de cada equipo (botón "Etiqueta QR").
       </p>

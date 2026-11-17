@@ -75,7 +75,7 @@
    lógica de mostrar/ocultar — dejamos solo el layout (flex en columna). */
 .app-screen, .deposito-screen, .admin-screen { display: flex; min-height: 100vh; flex-direction: column; }
 
-.deposito-screen .app-header { background: linear-gradient(90deg, var(--deposito) 0%, var(--deposito-mid) 100%); box-shadow: 0 2px 12px rgba(154,91,18,0.25); }
+.deposito-screen .app-header { background: linear-gradient(90deg, var(--deposito) 0%, var(--deposito-mid) 100%); box-shadow: 0 2px 12px rgba(26,58,107,0.25); }
 .deposito-screen .nav-tab.active { color: var(--deposito); border-bottom-color: var(--deposito); }
 .deposito-screen .nav-tab:hover { color: var(--deposito); }
 
@@ -282,6 +282,26 @@
 .stat-label { font-size: 10px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
 .meta-info { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
+/* ===== PARA ATENDER (el inicio del Depósito) =====
+   Tarjetas que llevan a cada sección; en el celular, una debajo de otra. */
+.para-atender-titulo { font-size: 13px; font-weight: 800; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.8px; margin: 18px 0 10px; }
+.para-atender { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.para-atender-tarjeta {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; min-width: 0;
+  background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  color: var(--text); text-decoration: none; transition: border-color 0.2s, transform 0.2s;
+}
+.para-atender-tarjeta:hover { border-color: var(--blue-light); transform: translateY(-1px); }
+.para-atender-tarjeta:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.para-atender-tarjeta.alerta { border-left: 4px solid var(--danger); }
+.para-atender-cabeza { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--text-mid); }
+.para-atender-numero { font-size: 26px; font-weight: 800; color: var(--blue); line-height: 1.1; }
+.para-atender-numero small { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.para-atender-tarjeta.alerta .para-atender-numero { color: var(--danger); }
+.para-atender-detalle { font-size: 12px; color: var(--text-muted); }
+.para-atender-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.para-atender-lista strong { color: var(--text); font-weight: 700; }
+
 /* ===== DIVISOR ===== */
 .divider { height: 1px; background: var(--border); margin: 18px 0; }
 
@@ -314,3 +334,87 @@
   .search-wrap { min-width: 180px; }
   .filter-date-range { width: auto; }
 }
+
+/* Selector de depósito (arriba, en la cabecera del Depósito): el depósito en el que se está y la lista de los suyos. Sin desenfoques: la PC
+   del trabajo no tiene aceleración gráfica. */
+.dep-selector { position: relative; display: inline-block; }
+.dep-selector-boton { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.35); border-radius: 8px; padding: 3px 10px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; max-width: 100%; min-width: 0; }
+.dep-selector-boton span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dep-selector-boton:hover { background: rgba(255,255,255,0.26); }
+.dep-selector-lista { position: absolute; top: calc(100% + 6px); left: 0; z-index: 300; min-width: 240px; max-width: 86vw; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 6px; }
+.dep-selector-fila { display: flex; align-items: center; gap: 4px; border-radius: 8px; }
+.dep-selector-fila.actual { background: var(--surface2); }
+.dep-selector-ir { flex: 1; display: flex; align-items: center; gap: 8px; text-align: left; background: none; border: none; padding: 9px 10px; font: inherit; font-size: 14px; color: var(--text); cursor: pointer; border-radius: 8px; }
+.dep-selector-fila.actual .dep-selector-ir { font-weight: 800; }
+.dep-selector-ir:hover { background: var(--surface2); }
+.dep-selector-estrella { background: none; border: none; padding: 8px; cursor: pointer; color: var(--text-mid); border-radius: 8px; display: inline-flex; }
+.dep-selector-estrella:hover { background: var(--surface2); }
+.dep-selector-estrella.marcada { color: #b7791f; }
+.dep-selector-estrella.marcada svg { fill: currentColor; }
+.dep-selector-ayuda { margin: 6px 8px 2px; font-size: 12px; color: var(--text-mid); display: flex; align-items: center; gap: 4px; }
+
+/* Editar usuario: la lista de permisos ("dónde y con qué rol") */
+.permisos-agregar { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+@media (max-width: 560px) { .permisos-agregar { grid-template-columns: 1fr; } }
+.permisos-ayuda { font-size: 12px; color: var(--text-mid); margin: 6px 0 0; }
+.permisos-lista { margin: 12px 0 16px; border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; background: var(--surface2); }
+.permisos-grupo { font-size: 11px; font-weight: 800; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.6px; margin: 8px 0 4px; }
+.permisos-fila { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid var(--border); }
+.permisos-grupo + .permisos-fila { border-top: none; }
+.permisos-nombre { flex: 1; font-weight: 700; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.permisos-rol { width: auto; min-width: 140px; }
+
+/* Configuración → Depósito: en qué depósito se está trabajando (el mismo selector de la cabecera, en versión clara) */
+.config-deposito-actual { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--text-mid); margin: 0 0 14px; }
+.dep-selector.claro .dep-selector-boton { background: var(--surface2); color: var(--text); border-color: var(--border); }
+.dep-selector.claro .dep-selector-boton:hover { background: var(--surface); }
+
+/* La cabecera no puede ser más ancha que la pantalla: el nombre de la empresa y el del depósito se achican (y se cortan con "…") antes que
+   empujar la página para el costado en el celular. */
+.header-logo, .header-logo > div { min-width: 0; }
+.header-logo > div { flex: 1 1 auto; }
+.header-right { flex-shrink: 0; }
+.header-logo-fallback { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-title { max-width: 100%; }
+.dep-selector { max-width: 100%; min-width: 0; }
+@media (max-width: 600px) {
+  .header-logo img { height: 28px; max-width: 32vw; }
+  .header-logo-fallback { font-size: 17px; }
+  .dep-selector-boton { font-size: 13px; padding: 2px 8px; gap: 4px; }
+  .dep-selector-lista { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; max-width: none; }
+}
+
+/* Los permisos especiales de una persona, por área en desplegables (src/features/admin/PermisosEspeciales.tsx) */
+.permisos-extra { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.permisos-extra-grupo { border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); overflow: hidden; }
+.permisos-extra-titulo { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: none; cursor: pointer;
+  font: inherit; color: var(--text); text-align: left; min-height: 44px; }
+.permisos-extra-titulo:hover { background: var(--surface); }
+.permisos-extra-titulo:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.permisos-extra-nombre { flex: 1; font-weight: 700; font-size: 14px; }
+.permisos-extra-cuenta { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.permisos-extra-cuenta.con { color: var(--primary); font-weight: 700; }
+.permisos-extra-items { padding: 2px 12px 8px; border-top: 1px solid var(--border); background: var(--surface); }
+.permisos-extra-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; margin: 0; cursor: pointer; font-weight: 400; text-transform: none; letter-spacing: normal; font-size: 14px; color: var(--text); }
+.permisos-extra-item + .permisos-extra-item { border-top: 1px solid var(--border); }
+.permisos-extra-item input { margin-top: 3px; flex-shrink: 0; }
+.permisos-extra-item-nombre { font-size: 14px; font-weight: 600; color: var(--text); }
+.permisos-extra-dueno { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.permisos-extra-ayuda { display: block; font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+
+/* La ficha de una persona en su propia página (Configuración → Usuarios → Editar; src/features/admin/FichaDeUsuario.tsx) */
+.ficha-usuario-pagina { max-width: 760px; margin: 0 auto; width: 100%; }
+.ficha-usuario-volver { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--blue); text-decoration: none; padding: 8px 0; min-height: 44px; }
+.ficha-usuario-volver:hover { text-decoration: underline; }
+.ficha-usuario-cabecera { margin: 4px 0 16px; }
+.ficha-usuario-nombre { font-size: 22px; font-weight: 800; color: var(--text); margin: 0; }
+.ficha-usuario-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--text-mid); }
+.ficha-usuario { display: flex; flex-direction: column; gap: 14px; }
+.ficha-usuario-parte { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.ficha-usuario-parte > .form-grid { margin-bottom: -16px; }
+.ficha-usuario-titulo { font-size: 15px; font-weight: 800; color: var(--text); margin: 0 0 12px; }
+.ficha-usuario-parte .permisos-lista, .ficha-usuario-parte .permisos-extra { margin-bottom: 0; }
+.ficha-usuario-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+/* "Guardar" queda a la vista, abajo, aunque se baje por la página */
+.ficha-usuario-guardar { position: sticky; bottom: 0; z-index: 5; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--border); }
+@media (max-width: 560px) { .ficha-usuario-parte { padding: 14px 12px; } .ficha-usuario-nombre { font-size: 19px; } }

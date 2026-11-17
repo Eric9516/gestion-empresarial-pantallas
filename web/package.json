@@ -1,0 +1,33 @@
+{
+  "name": "gestion-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "La app (Next.js). Se arranca desde la carpeta de arriba con \"pnpm run dev\".",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3020",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "bcryptjs": "3.0.3",
+    "next": "16.4.3",
+    "pg": "8.23.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1",
+    "web-push": "3.6.7",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24",
+    "@types/pg": "^8",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2"
+  }
+}

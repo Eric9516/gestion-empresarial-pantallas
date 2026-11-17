@@ -1,4 +1,5 @@
 import { generarTablaPdf, type ColumnaPdf } from './tablaPdf';
+import type { LetraPdf } from './preferencias';
 
 export interface LineaPedido {
   codigo: string;
@@ -14,6 +15,7 @@ export interface PedidoPdfInput {
   nota: string;
   incluirCodigo: boolean;
   lineas: LineaPedido[];
+  letra?: LetraPdf;
 }
 
 // Lista de artículos para pasarle a un proveedor. Todo lo que se ve sale de lo
@@ -32,6 +34,7 @@ export function generarPedidoBlob(input: PedidoPdfInput): Promise<Blob> {
     datos: [{ etiqueta: 'Para', texto: input.para }],
     nota: input.nota,
     columnas,
+    letra: input.letra,
     secciones: [{
       filas: input.lineas.map(l => [...(input.incluirCodigo ? [l.codigo] : []), l.descripcion, l.cantidad]),
     }],

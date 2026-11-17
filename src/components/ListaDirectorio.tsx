@@ -1,6 +1,4 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { useAuth } from '../auth/AuthContext';
-import { isDirectorioAdmin } from '../lib/types';
 import { useToast } from './ToastProvider';
 import { useConfirm } from './ConfirmProvider';
 import { exportarExcel } from '../lib/exportExcel';
@@ -21,6 +19,8 @@ export interface AccionesDeFila<T> {
 }
 
 interface Props<T extends { id: string; activo: boolean | null }> {
+  /** Puede crear, editar y eliminar (administra el Directorio). */
+  admin: boolean;
   datos: T[] | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -50,10 +50,8 @@ interface Props<T extends { id: string; activo: boolean | null }> {
 // La lista del Directorio (proveedores, comisionistas): estadísticas arriba, buscador, filtros, tabla o tarjetas, y los pasos de ver, editar y eliminar.
 // Lo que cambia de una a otra (columnas, tarjetas, textos, qué se exporta) llega por parámetros; lo demás está acá una sola vez.
 export default function ListaDirectorio<T extends { id: string; activo: boolean | null }>({
-  datos, isLoading, isError, icono, textos, grupo, camposDeBusqueda, columnas, tarjeta, exportar, eliminar, formulario, detalle, extras,
+  admin, datos, isLoading, isError, icono, textos, grupo, camposDeBusqueda, columnas, tarjeta, exportar, eliminar, formulario, detalle, extras,
 }: Props<T>) {
-  const { profile } = useAuth();
-  const admin = isDirectorioAdmin(profile);
   const toast = useToast();
   const confirmar = useConfirm();
 

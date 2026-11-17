@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import ResponsiveList, { type Column } from '../../components/ResponsiveList';
 import BotonVerMas from '../../components/BotonVerMas';
 import { useToast } from '../../components/ToastProvider';
 import { useConfirm } from '../../components/ConfirmProvider';
-import { useLimpiarSugerencias, useSugerenciasQuery, type Sugerencia } from './useSugerencias';
+import { usePaginas } from '../../lib/usePaginas';
+import { useServicioDeConfiguracion } from './servicioDeConfiguracion';
+import type { Sugerencia } from './tipos';
 import { Button } from '@/components/ui/button';
 import { mensajeDeError } from '@/lib/errores';
 import { Icono } from '@/components/Icono';
@@ -28,15 +31,17 @@ function renderCard(s: Sugerencia) {
 }
 
 export default function SugerenciasPane() {
-  const { filas: rows, isLoading, isError, hayMas, cargandoMas, verMas } = useSugerenciasQuery();
-  const limpiar = useLimpiarSugerencias();
+  const { sugerencias: servicio } = useServicioDeConfiguracion();
+  const [vez, setVez] = useState(0);
+  const { filas: rows, isLoading, isError, hayMas, cargandoMas, verMas } = usePaginas(`sugerencias|${vez}`, servicio.pagina);
   const toast = useToast();
   const confirmar = useConfirm();
 
   async function handleLimpiar() {
     if (!(await confirmar('¿Borrar todas las sugerencias?', { textoConfirmar: 'Borrar todas', peligroso: true }))) return;
     try {
-      await limpiar.mutateAsync();
+      await servicio.limpiar();
+      setVez(v => v + 1);
       toast('Sugerencias limpiadas', 'success');
     } catch (e) {
       toast('Error al limpiar: ' + mensajeDeError(e), 'error');

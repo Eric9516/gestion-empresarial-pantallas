@@ -1,15 +1,17 @@
 import { useId, useState } from 'react';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { useConfigMantenimiento, useGuardarConfigMantenimiento } from './usePreventivo';
+import { mensajeDeError } from '../../lib/errores';
+import { useMantenimiento } from './servicio';
 import type { FranjaRecepcion } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Icono } from '@/components/Icono';
 
-// Formato de la OT (lo elige cada empresa): datos del registro de calidad que salen en el encabezado
-// de la OT impresa y los controles de la liberación del equipo al terminar.
+// Formato de la OT (del diseño del socio; uno por empresa, lo elige quien administra): los datos del registro de calidad que salen en el
+// encabezado de la OT impresa, los controles de la liberación del equipo al terminar y (del socio, 10/11/2026) el horario en que les llegan
+// las OT terminadas al jefe de taller y al responsable.
 export default function FormatoOTModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Modal open={open} onClose={onClose} title={<><Icono n="config" /> Formato de la OT</>}>
@@ -23,26 +25,33 @@ const DIAS: [number, string][] = [[1, 'Lunes'], [2, 'Martes'], [3, 'Miércoles']
 function Formulario({ onClose }: { onClose: () => void }) {
   const uid = useId();
   const toast = useToast();
-  const config = useConfigMantenimiento();
-  const guardar = useGuardarConfigMantenimiento();
-  const [codigo, setCodigo] = useState(config.registroCodigo);
-  const [version, setVersion] = useState(config.registroVersion);
-  const [vigencia, setVigencia] = useState(config.registroVigencia);
-  const [controles, setControles] = useState(config.controlesLiberacion.join('\n'));
-  const [recibe, setRecibe] = useState(config.recibeLiberacion);
-  const [horario, setHorario] = useState(config.horarioRecepcion);
+  const s = useMantenimiento();
+  const [codigo, setCodigo] = useState(s.config.registroCodigo);
+  const [version, setVersion] = useState(s.config.registroVersion);
+  const [vigencia, setVigencia] = useState(s.config.registroVigencia);
+  const [controles, setControles] = useState(s.config.controlesLiberacion.join('\n'));
+  const [recibe, setRecibe] = useState(s.config.recibeLiberacion);
+  const [horario, setHorario] = useState(s.config.horarioRecepcion);
+  const [guardando, setGuardando] = useState(false);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    await guardar.mutateAsync({
-      ...config,
-      registroCodigo: codigo.trim(), registroVersion: version.trim(), registroVigencia: vigencia,
-      controlesLiberacion: controles.split(/\r?\n/).map(c => c.trim()).filter(Boolean), recibeLiberacion: recibe.trim(),
-      // Se descartan los días con el horario al revés (hasta antes que desde).
-      horarioRecepcion: { dias: horario.dias.filter(d => d.desde < d.hasta).sort((a, b) => ((a.dia + 6) % 7) - ((b.dia + 6) % 7)) },
-    });
-    toast('Formato guardado: se usa en las próximas OT que imprimas o termines', 'success');
-    onClose();
+    setGuardando(true);
+    try {
+      await s.guardarConfig({
+        ...s.config,
+        // se descartan los días con el horario al revés (hasta antes que desde)
+        horarioRecepcion: { dias: horario.dias.filter(d => d.desde < d.hasta).sort((a, b) => ((a.dia + 6) % 7) - ((b.dia + 6) % 7)) },
+        registroCodigo: codigo.trim(), registroVersion: version.trim(), registroVigencia: vigencia,
+        controlesLiberacion: controles.split(/\r?\n/).map(c => c.trim()).filter(Boolean), recibeLiberacion: recibe.trim(),
+      });
+      toast('Formato guardado: se usa en las próximas OT que imprimas o termines', 'success');
+      onClose();
+    } catch (err) {
+      toast(mensajeDeError(err), 'error');
+    } finally {
+      setGuardando(false);
+    }
   }
 
   return (
@@ -51,11 +60,11 @@ function Formulario({ onClose }: { onClose: () => void }) {
       <div className="form-grid">
         <div className="form-group">
           <label htmlFor={`${uid}-c`}>Código del registro</label>
-          <Input id={`${uid}-c`} value={codigo} onChange={e => setCodigo(e.target.value)} placeholder="Ej.: REG-MANT-01" />
+          <Input id={`${uid}-c`} value={codigo} onChange={e => setCodigo(e.target.value)} placeholder="Ej.: REG-MANT-01" maxLength={60} />
         </div>
         <div className="form-group">
           <label htmlFor={`${uid}-v`}>Versión</label>
-          <Input id={`${uid}-v`} value={version} onChange={e => setVersion(e.target.value)} placeholder="Ej.: 01" />
+          <Input id={`${uid}-v`} value={version} onChange={e => setVersion(e.target.value)} placeholder="Ej.: 01" maxLength={30} />
         </div>
         <div className="form-group">
           <label htmlFor={`${uid}-f`}>Fecha de vigencia</label>
@@ -64,14 +73,14 @@ function Formulario({ onClose }: { onClose: () => void }) {
         <div className="form-group full">
           <label htmlFor={`${uid}-l`}>Liberación del equipo: controles de entrega (uno por renglón)</label>
           <Textarea id={`${uid}-l`} rows={6} value={controles} onChange={e => setControles(e.target.value)} placeholder={'Sin objetos extraños\nLimpieza\nSanitización'} />
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Se tildan al terminar cada OT y salen en la OT impresa. Vacío = las OT no tienen liberación.</div>
+          <div style={{ fontSize: 12, color: 'var(--text-mid)', marginTop: 4 }}>Se tildan al terminar cada OT y salen en la OT impresa. Vacío = las OT no tienen liberación.</div>
         </div>
         <div className="form-group full">
           <label htmlFor={`${uid}-r`}>Quién recibe el equipo</label>
-          <Input id={`${uid}-r`} value={recibe} onChange={e => setRecibe(e.target.value)} placeholder="Ej.: Responsable de Producción" />
+          <Input id={`${uid}-r`} value={recibe} onChange={e => setRecibe(e.target.value)} placeholder="Ej.: Responsable de Producción" maxLength={120} />
         </div>
-        <div className="form-group full">
-          <label>Horario en que llegan las OT terminadas (al jefe de taller y al responsable)</label>
+        <fieldset className="form-group full" style={{ border: 'none', padding: 0, margin: 0 }}>
+          <legend style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Horario en que llegan las OT terminadas (al jefe de taller y al responsable)</legend>
           <div className="mt-horario">
             {DIAS.map(([n, nombre]) => {
               const f = horario.dias.find(d => d.dia === n);
@@ -92,12 +101,12 @@ function Formulario({ onClose }: { onClose: () => void }) {
               );
             })}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Las que se terminan fuera de horario esperan y llegan al empezar el próximo día marcado.</div>
-        </div>
+          <div style={{ fontSize: 12, color: 'var(--text-mid)', marginTop: 4 }}>Las que se terminan fuera de horario esperan y llegan al empezar el próximo día marcado.</div>
+        </fieldset>
       </div>
       <div className="modal-footer">
         <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" variant="primary"><Icono n="guardar" /> Guardar</Button>
+        <Button type="submit" variant="primary" disabled={guardando}><Icono n="guardar" /> {guardando ? 'Guardando...' : 'Guardar'}</Button>
       </div>
     </form>
   );

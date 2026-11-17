@@ -2,11 +2,9 @@ import { useMemo, useState } from 'react';
 import { useAlCambiar } from '../../lib/useAlCambiar';
 import Modal from '../../components/Modal';
 import { useToast } from '../../components/ToastProvider';
-import { registrarErrorAccion } from '../../lib/errorLogging';
-import { useProveedoresQuery } from '../proveedores/useProveedores';
 import { enviosDelProveedor, enviosLibres, etiquetaDeEnvio } from '../rotulos/etiquetaEnvio';
-import { useDetallesDeEnviosQuery, useRotulosQuery } from '../rotulos/useRotulos';
-import { useEditarReparacion, useEnviosAsignadosQuery, type ReparacionConDetalle } from './useReparaciones';
+import { useServicioDeReparaciones } from './servicioDeReparaciones';
+import type { ReparacionConDetalle } from './tipos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -19,9 +17,9 @@ interface Props {
 }
 
 export default function EditarReparacionModal({ reparacion, onClose }: Props) {
-  const { data: proveedores } = useProveedoresQuery();
-  const { data: envios } = useRotulosQuery();
-  const editar = useEditarReparacion();
+  const servicio = useServicioDeReparaciones();
+  const { proveedores, envios } = servicio;
+  const [guardando, setGuardando] = useState(false);
   const toast = useToast();
 
   const [proveedorId, setProveedorId] = useState('');
@@ -32,10 +30,10 @@ export default function EditarReparacionModal({ reparacion, onClose }: Props) {
   const [ocFecha, setOcFecha] = useState('');
 
   // Solo los envíos del proveedor elegido (más el que la reparación ya tenía, si es de otro) que no tengan ya otra reparación, con lo que lleva cada uno.
-  const { data: asignados } = useEnviosAsignadosQuery();
+  const asignados = servicio.enviosAsignados;
   const enviosDelProv = useMemo(() => enviosDelProveedor(envios, proveedorId, reparacion?.envio_id), [envios, proveedorId, reparacion?.envio_id]);
   const enviosLibresDelProv = useMemo(() => enviosLibres(enviosDelProv, asignados, reparacion?.id), [enviosDelProv, asignados, reparacion?.id]);
-  const { data: detallesDeEnvios } = useDetallesDeEnviosQuery(enviosLibresDelProv.map(e => e.id));
+  const detallesDeEnvios = servicio.detallesDeEnvios;
 
   useAlCambiar([reparacion], () => {
     if (reparacion) {
@@ -52,8 +50,9 @@ export default function EditarReparacionModal({ reparacion, onClose }: Props) {
     if (!reparacion) return;
     if (!proveedorId) { toast('Elegí un proveedor', 'error'); return; }
     if (!motivo.trim()) { toast('Ingresá un motivo', 'error'); return; }
+    setGuardando(true);
     try {
-      await editar.mutateAsync({
+      await servicio.editar({
         id: reparacion.id,
         proveedor_id: proveedorId,
         motivo: motivo.trim(),
@@ -65,8 +64,10 @@ export default function EditarReparacionModal({ reparacion, onClose }: Props) {
       toast('Reparación actualizada', 'success');
       onClose();
     } catch (err) {
-      await registrarErrorAccion('Error al editar una reparación', err);
+      await servicio.registrarError('Error al editar una reparación', err);
       toast('Error al guardar: ' + mensajeDeError(err), 'error');
+    } finally {
+      setGuardando(false);
     }
   }
 
@@ -78,8 +79,8 @@ export default function EditarReparacionModal({ reparacion, onClose }: Props) {
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="success" disabled={editar.isPending} onClick={() => void handleGuardar()}>
-            {editar.isPending ? 'Guardando...' : 'Guardar cambios'}
+          <Button variant="success" disabled={guardando} onClick={() => void handleGuardar()}>
+            {guardando ? 'Guardando...' : 'Guardar cambios'}
           </Button>
         </>
       }
